@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCart } from '@/contexts/CartContext';
 import { formatCurrency } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +35,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { FloatingContactButton } from './FloatingContactButton';
+import { CartDrawer } from '@/components/cart/CartDrawer';
 import { supabase } from '@/integrations/supabase/client';
 
 interface NavItem {
@@ -75,6 +78,7 @@ const depositItems: NavItem[] = [
 export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
+  const { totalItems } = useCart();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -275,8 +279,9 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
 
           <div className="flex-1" />
 
+          {/* Cart Button */}
+          <CartDrawer />
 
-          {/* Language Switcher */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="mr-4">

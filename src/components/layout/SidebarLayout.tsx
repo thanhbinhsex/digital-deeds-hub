@@ -44,8 +44,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Home', labelVi: 'Trang Chủ', icon: Home, href: '/' },
-  { label: 'All Products', labelVi: 'Full Tool', icon: Package, href: '/products' },
-  { label: 'API', labelVi: 'API', icon: Code2, href: '/products?category=api' },
 ];
 
 const menuItems: NavItem[] = [
@@ -70,7 +68,6 @@ const menuItems: NavItem[] = [
 ];
 
 const depositItems: NavItem[] = [
-  { label: 'Crypto', labelVi: 'Crypto', icon: Bitcoin, href: '/account/topups/new?method=crypto' },
   { label: 'Bank Transfer', labelVi: 'Ngân Hàng', icon: Building2, href: '/account/topups/new?method=bank' },
 ];
 
@@ -241,10 +238,6 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
 
           <div className="flex-1" />
 
-          {/* Exchange Rate */}
-          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground mr-4">
-            <span>1 USD = 24.000 VND</span>
-          </div>
 
           {/* Language Switcher */}
           <DropdownMenu>

@@ -100,6 +100,7 @@ const translations = {
     // Admin
     'admin.dashboard': 'Dashboard',
     'admin.products': 'Products',
+    'admin.categories': 'Categories',
     'admin.orders': 'Orders',
     'admin.topups': 'Top Up Requests',
     'admin.users': 'Users',
@@ -228,6 +229,7 @@ const translations = {
     // Admin
     'admin.dashboard': 'Tổng quan',
     'admin.products': 'Sản phẩm',
+    'admin.categories': 'Danh mục',
     'admin.orders': 'Đơn hàng',
     'admin.topups': 'Yêu cầu nạp tiền',
     'admin.users': 'Người dùng',

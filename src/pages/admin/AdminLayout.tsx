@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Home,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ import { useState } from 'react';
 const adminLinks = [
   { path: '/admin', icon: LayoutDashboard, labelKey: 'admin.dashboard', exact: true },
   { path: '/admin/products', icon: Package, labelKey: 'admin.products' },
+  { path: '/admin/categories', icon: FolderOpen, labelKey: 'admin.categories' },
   { path: '/admin/orders', icon: ShoppingCart, labelKey: 'admin.orders' },
   { path: '/admin/topups', icon: CreditCard, labelKey: 'admin.topups' },
   { path: '/admin/users', icon: Users, labelKey: 'admin.users' },

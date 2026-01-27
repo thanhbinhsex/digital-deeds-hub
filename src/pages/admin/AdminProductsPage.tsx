@@ -311,12 +311,12 @@ export default function AdminProductsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Select value={watch('category_id') || ''} onValueChange={(v) => setValue('category_id', v)}>
+                  <Select value={watch('category_id') || 'none'} onValueChange={(v) => setValue('category_id', v === 'none' ? '' : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {categories?.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {lang === 'vi' && cat.name_vi ? cat.name_vi : cat.name}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -33,6 +33,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { FloatingContactButton } from './FloatingContactButton';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NavItem {
   label: string;
@@ -42,20 +43,18 @@ interface NavItem {
   children?: { label: string; labelVi: string; href: string }[];
 }
 
+interface Category {
+  id: string;
+  name: string;
+  name_vi: string | null;
+  slug: string;
+}
+
 const navItems: NavItem[] = [
   { label: 'Home', labelVi: 'Trang Chủ', icon: Home, href: '/' },
 ];
 
-const menuItems: NavItem[] = [
-  {
-    label: 'Software',
-    labelVi: 'Phần Mềm',
-    icon: Package,
-    children: [
-      { label: 'All Software', labelVi: 'Tất cả phần mềm', href: '/products?category=software' },
-      { label: 'Marketing Tools', labelVi: 'Công cụ Marketing', href: '/products?category=marketing' },
-    ],
-  },
+const historyItems: NavItem[] = [
   {
     label: 'History',
     labelVi: 'Lịch Sử',
@@ -76,6 +75,33 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   const { t, lang, setLang } = useLanguage();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('id, name, name_vi, slug')
+        .order('sort_order', { ascending: true });
+      if (data) setCategories(data);
+    };
+    fetchCategories();
+  }, []);
+
+  // Build dynamic software menu from categories
+  const softwareItem: NavItem = {
+    label: 'Software',
+    labelVi: 'Phần Mềm',
+    icon: Package,
+    children: [
+      { label: 'All Software', labelVi: 'Tất cả phần mềm', href: '/products' },
+      ...categories.map(cat => ({
+        label: cat.name,
+        labelVi: cat.name_vi || cat.name,
+        href: `/products?category=${cat.slug}`,
+      })),
+    ],
+  };
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';
@@ -152,7 +178,8 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
             {lang === 'vi' ? 'MENU' : 'MENU'}
           </p>
           <div className="space-y-1">
-            {menuItems.map((item) => (
+            <NavLink key="software" item={softwareItem} onClick={onLinkClick} />
+            {historyItems.map((item) => (
               <NavLink key={item.label} item={item} onClick={onLinkClick} />
             ))}
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +28,7 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatDate } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, FolderOpen, Loader2, Search, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, FolderOpen, Loader2, Search, Upload, X } from 'lucide-react';
 
 const categorySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -47,6 +47,10 @@ export default function AdminCategoriesPage() {
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: categories, isLoading } = useQuery({
     queryKey: ['admin-categories', search],
@@ -98,14 +102,64 @@ export default function AdminCategoriesPage() {
     },
   });
 
+  const uploadIcon = async (file: File, slug: string): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${slug}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('category-icons')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('category-icons')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(lang === 'en' ? 'Please select an image file' : 'Vui lòng chọn file hình ảnh');
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error(lang === 'en' ? 'Image must be less than 2MB' : 'Hình ảnh phải nhỏ hơn 2MB');
+        return;
+      }
+      setIconFile(file);
+      setIconPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const removeIcon = () => {
+    setIconFile(null);
+    setIconPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: CategoryForm) => {
+      let iconUrl = data.icon || null;
+      
+      if (iconFile) {
+        setIsUploading(true);
+        iconUrl = await uploadIcon(iconFile, data.slug);
+        setIsUploading(false);
+      }
+
       const { error } = await supabase.from('categories').insert({
         name: data.name,
         name_vi: data.name_vi || null,
         slug: data.slug,
         description: data.description || null,
-        icon: data.icon || null,
+        icon: iconUrl,
         sort_order: data.sort_order,
       });
       if (error) throw error;
@@ -115,9 +169,10 @@ export default function AdminCategoriesPage() {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success(lang === 'en' ? 'Category created!' : 'Đã tạo danh mục!');
       setIsDialogOpen(false);
-      reset();
+      resetForm();
     },
     onError: (error: any) => {
+      setIsUploading(false);
       toast.error(error.message);
     },
   });
@@ -125,6 +180,20 @@ export default function AdminCategoriesPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: CategoryForm & { id: string }) => {
       const { id, ...rest } = data;
+      let iconUrl = rest.icon || null;
+      
+      if (iconFile) {
+        setIsUploading(true);
+        iconUrl = await uploadIcon(iconFile, rest.slug);
+        setIsUploading(false);
+      } else if (iconPreview === null && editingCategory?.icon) {
+        // User removed the icon
+        iconUrl = null;
+      } else if (iconPreview && !iconFile) {
+        // Keep existing icon
+        iconUrl = editingCategory?.icon || null;
+      }
+
       const { error } = await supabase
         .from('categories')
         .update({
@@ -132,7 +201,7 @@ export default function AdminCategoriesPage() {
           name_vi: rest.name_vi || null,
           slug: rest.slug,
           description: rest.description || null,
-          icon: rest.icon || null,
+          icon: iconUrl,
           sort_order: rest.sort_order,
         })
         .eq('id', id);
@@ -144,9 +213,10 @@ export default function AdminCategoriesPage() {
       toast.success(lang === 'en' ? 'Category updated!' : 'Đã cập nhật danh mục!');
       setIsDialogOpen(false);
       setEditingCategory(null);
-      reset();
+      resetForm();
     },
     onError: (error: any) => {
+      setIsUploading(false);
       toast.error(error.message);
     },
   });
@@ -166,6 +236,15 @@ export default function AdminCategoriesPage() {
     },
   });
 
+  const resetForm = () => {
+    reset();
+    setIconFile(null);
+    setIconPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleEdit = (category: any) => {
     setEditingCategory(category);
     reset({
@@ -176,6 +255,8 @@ export default function AdminCategoriesPage() {
       icon: category.icon || '',
       sort_order: category.sort_order || 0,
     });
+    setIconPreview(category.icon || null);
+    setIconFile(null);
     setIsDialogOpen(true);
   };
 
@@ -189,6 +270,8 @@ export default function AdminCategoriesPage() {
       icon: '',
       sort_order: (categories?.length || 0) + 1,
     });
+    setIconPreview(null);
+    setIconFile(null);
     setIsDialogOpen(true);
   };
 
@@ -267,15 +350,59 @@ export default function AdminCategoriesPage() {
                 <Textarea {...register('description')} rows={2} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Icon (Lucide name)</Label>
-                  <Input {...register('icon')} placeholder="e.g. package, code, palette" />
+              <div className="space-y-2">
+                <Label>{lang === 'en' ? 'Icon Image' : 'Hình ảnh icon'}</Label>
+                <div className="flex items-center gap-4">
+                  {iconPreview ? (
+                    <div className="relative">
+                      <img
+                        src={iconPreview}
+                        alt="Icon preview"
+                        className="h-16 w-16 rounded-lg object-cover border border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeIcon}
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-16 w-16 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {lang === 'en' ? 'Upload Icon' : 'Tải lên icon'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {lang === 'en' ? 'PNG, JPG up to 2MB' : 'PNG, JPG tối đa 2MB'}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Sort Order</Label>
-                  <Input type="number" {...register('sort_order', { valueAsNumber: true })} />
-                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sort Order</Label>
+                <Input type="number" {...register('sort_order', { valueAsNumber: true })} />
               </div>
 
               <div className="flex justify-end gap-4">
@@ -285,12 +412,14 @@ export default function AdminCategoriesPage() {
                 <Button
                   type="submit"
                   className="gradient-primary text-primary-foreground"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending || isUploading}
                 >
-                  {(createMutation.isPending || updateMutation.isPending) && (
+                  {(createMutation.isPending || updateMutation.isPending || isUploading) && (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   )}
-                  {t('common.save')}
+                  {isUploading 
+                    ? (lang === 'en' ? 'Uploading...' : 'Đang tải...') 
+                    : t('common.save')}
                 </Button>
               </div>
             </form>
@@ -343,9 +472,17 @@ export default function AdminCategoriesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <FolderOpen className="h-5 w-5 text-primary" />
-                        </div>
+                        {category.icon ? (
+                          <img
+                            src={category.icon}
+                            alt=""
+                            className="h-10 w-10 rounded-lg object-cover border border-border"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <FolderOpen className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="font-medium">
                             {lang === 'vi' && category.name_vi ? category.name_vi : category.name}

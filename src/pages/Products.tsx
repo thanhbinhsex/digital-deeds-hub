@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ export default function ProductsPage() {
   });
 
   return (
-    <MainLayout>
+    <SidebarLayout>
       <div className="container py-8">
         {/* Header */}
         <div className="mb-8">
@@ -141,6 +141,6 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
-    </MainLayout>
+    </SidebarLayout>
   );
 }

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,7 +39,7 @@ export default function AccountLayout() {
   });
 
   return (
-    <MainLayout>
+    <SidebarLayout>
       <div className="container py-8">
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Sidebar */}
@@ -112,6 +112,6 @@ export default function AccountLayout() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </SidebarLayout>
   );
 }

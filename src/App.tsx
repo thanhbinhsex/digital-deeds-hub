@@ -18,6 +18,13 @@ import ProfilePage from "./pages/account/ProfilePage";
 import WalletPage from "./pages/account/WalletPage";
 import TopupsPage, { NewTopupPage } from "./pages/account/TopupsPage";
 import PurchasesPage from "./pages/account/PurchasesPage";
+import AdminLayout from "./pages/admin/AdminLayout";
+import DashboardPage from "./pages/admin/DashboardPage";
+import AdminProductsPage from "./pages/admin/AdminProductsPage";
+import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
+import AdminTopupsPage from "./pages/admin/AdminTopupsPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminAuditPage from "./pages/admin/AdminAuditPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +51,14 @@ const App = () => (
                   <Route path="purchases" element={<PurchasesPage />} />
                   <Route path="topups" element={<TopupsPage />} />
                   <Route path="topups/new" element={<NewTopupPage />} />
+                </Route>
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<DashboardPage />} />
+                  <Route path="products" element={<AdminProductsPage />} />
+                  <Route path="orders" element={<AdminOrdersPage />} />
+                  <Route path="topups" element={<AdminTopupsPage />} />
+                  <Route path="users" element={<AdminUsersPage />} />
+                  <Route path="audit" element={<AdminAuditPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

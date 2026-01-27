@@ -1,13 +1,11 @@
-import { MainLayout } from '@/components/layout/MainLayout';
-import { HeroSection } from '@/components/home/HeroSection';
-import { FeaturedProducts } from '@/components/home/FeaturedProducts';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
+import { HomeContent } from '@/components/home/HomeContent';
 
 const Index = () => {
   return (
-    <MainLayout>
-      <HeroSection />
-      <FeaturedProducts />
-    </MainLayout>
+    <SidebarLayout>
+      <HomeContent />
+    </SidebarLayout>
   );
 };
 

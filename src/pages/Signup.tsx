@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Loader2, Mail, Lock, User, Package } from 'lucide-react';
 
 const signupSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be less than 20 characters').regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers and underscores'),
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -41,7 +42,7 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupForm) => {
     setIsLoading(true);
-    const { error } = await signUp(data.email, data.password, data.fullName);
+    const { error } = await signUp(data.email, data.password, data.fullName, data.username);
     setIsLoading(false);
 
     if (error) {
@@ -73,6 +74,23 @@ export default function SignupPage() {
           </CardHeader>
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">{lang === 'en' ? 'Username' : 'Tên đăng nhập'}</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="username"
+                    className="pl-10"
+                    {...register('username')}
+                  />
+                </div>
+                {errors.username && (
+                  <p className="text-sm text-destructive">{errors.username.message}</p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="fullName">{t('auth.fullName')}</Label>
                 <div className="relative">

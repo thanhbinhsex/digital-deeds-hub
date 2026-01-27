@@ -274,22 +274,67 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
         {!sidebarCollapsed && <SidebarContent />}
         
         {sidebarCollapsed && (
-          <div className="flex-1 p-2 space-y-1">
-            {navItems.map((item) => (
+          <div className="flex-1 p-2 space-y-4">
+            {/* Main Nav */}
+            <div className="space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.href || '/'}
+                  className={cn(
+                    'flex items-center justify-center p-2.5 rounded-lg transition-colors',
+                    isActive(item.href || '/')
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                  title={lang === 'vi' ? item.labelVi : item.label}
+                >
+                  <item.icon className="h-5 w-5" />
+                </Link>
+              ))}
+            </div>
+
+            {/* Menu Section */}
+            <div className="space-y-1">
               <Link
-                key={item.label}
-                to={item.href || '/'}
+                to="/products"
                 className={cn(
                   'flex items-center justify-center p-2.5 rounded-lg transition-colors',
-                  isActive(item.href || '/')
+                  location.pathname.startsWith('/products')
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
-                title={lang === 'vi' ? item.labelVi : item.label}
+                title={lang === 'vi' ? 'Phần Mềm' : 'Software'}
               >
-                <item.icon className="h-5 w-5" />
+                <Package className="h-5 w-5" />
               </Link>
-            ))}
+              <Link
+                to="/account/purchases"
+                className={cn(
+                  'flex items-center justify-center p-2.5 rounded-lg transition-colors',
+                  location.pathname.startsWith('/account/purchases') || location.pathname.startsWith('/account/topups')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+                title={lang === 'vi' ? 'Lịch Sử' : 'History'}
+              >
+                <ShoppingCart className="h-5 w-5" />
+              </Link>
+            </div>
+
+            {/* Deposit Section */}
+            <div className="space-y-1">
+              <Link
+                to="/account/topups/new?method=bank"
+                className={cn(
+                  'flex items-center justify-center p-2.5 rounded-lg transition-colors',
+                  'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+                title={lang === 'vi' ? 'Ngân Hàng' : 'Bank Transfer'}
+              >
+                <Building2 className="h-5 w-5" />
+              </Link>
+            </div>
           </div>
         )}
       </aside>

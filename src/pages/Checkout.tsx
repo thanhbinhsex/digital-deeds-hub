@@ -1,0 +1,319 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatCurrency } from '@/lib/i18n';
+import { toast } from 'sonner';
+import { Trash2, Minus, Plus, Wallet, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
+
+export default function CheckoutPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { items, removeItem, updateQuantity, clearCart, totalAmount } = useCart();
+  const { t, lang } = useLanguage();
+  const queryClient = useQueryClient();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fetch wallet balance
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const canPayWithWallet = wallet && wallet.balance >= totalAmount;
+
+  // Create order mutation
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+      if (!canPayWithWallet) throw new Error('Insufficient balance');
+
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          status: 'pending',
+          total_amount: totalAmount,
+          currency: 'USD',
+          payment_method: 'wallet',
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: item.productId,
+        product_name: item.name,
+        unit_price: item.price,
+        quantity: item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Create payment record
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          order_id: order.id,
+          provider: 'wallet',
+          amount: totalAmount,
+          status: 'completed',
+        });
+
+      if (paymentError) throw paymentError;
+
+      // Update order status to paid
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'paid' })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
+
+      // Create entitlements for each product
+      const entitlements = items.map((item) => ({
+        user_id: user.id,
+        product_id: item.productId,
+        order_id: order.id,
+      }));
+
+      const { error: entitlementError } = await supabase
+        .from('entitlements')
+        .insert(entitlements);
+
+      if (entitlementError) throw entitlementError;
+
+      return order;
+    },
+    onSuccess: () => {
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(t('checkout.success'));
+      navigate('/account/purchases');
+    },
+    onError: (error) => {
+      console.error('Order error:', error);
+      toast.error(t('common.error'));
+    },
+  });
+
+  const handleCheckout = async () => {
+    if (!user) {
+      toast.error(lang === 'en' ? 'Please login first' : 'Vui lòng đăng nhập');
+      navigate('/login');
+      return;
+    }
+
+    if (!canPayWithWallet) {
+      toast.error(t('checkout.insufficientBalance'));
+      return;
+    }
+
+    setIsProcessing(true);
+    await createOrderMutation.mutateAsync();
+    setIsProcessing(false);
+  };
+
+  if (items.length === 0) {
+    return (
+      <MainLayout>
+        <div className="container py-20 text-center">
+          <ShoppingBag className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <h1 className="text-2xl font-bold mb-4">{t('cart.empty')}</h1>
+          <Button onClick={() => navigate('/products')} className="gradient-primary text-primary-foreground">
+            {t('hero.cta')}
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="container py-8">
+        <h1 className="font-display text-3xl font-bold mb-8">{t('checkout.title')}</h1>
+
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Cart items */}
+          <div className="lg:col-span-2 space-y-4">
+            {items.map((item) => {
+              const name = lang === 'vi' && item.nameVi ? item.nameVi : item.name;
+              return (
+                <Card key={item.id} className="border-border/50">
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      {/* Image */}
+                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
+                            <ShoppingBag className="h-8 w-8 text-primary/50" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate">{name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {formatCurrency(item.price, 'USD', lang)}
+                        </p>
+
+                        {/* Quantity controls */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Price & Remove */}
+                      <div className="text-right">
+                        <p className="font-semibold">
+                          {formatCurrency(item.price * item.quantity, 'USD', lang)}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="mt-2 text-destructive hover:text-destructive"
+                          onClick={() => removeItem(item.productId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Order summary */}
+          <div>
+            <Card className="sticky top-24 border-border/50">
+              <CardHeader>
+                <CardTitle>{t('cart.title')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {lang === 'en' ? 'Subtotal' : 'Tạm tính'} ({items.length} {lang === 'en' ? 'items' : 'sản phẩm'})
+                  </span>
+                  <span>{formatCurrency(totalAmount, 'USD', lang)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>{t('cart.total')}</span>
+                  <span className="gradient-text">
+                    {formatCurrency(totalAmount, 'USD', lang)}
+                  </span>
+                </div>
+
+                {/* Wallet info */}
+                {user && wallet && (
+                  <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-5 w-5 text-primary" />
+                      <span className="font-medium">{t('checkout.walletBalance')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-bold">
+                        {formatCurrency(wallet.balance, 'USD', lang)}
+                      </span>
+                      {canPayWithWallet ? (
+                        <Badge className="bg-success/20 text-success border-0">
+                          {lang === 'en' ? 'Sufficient' : 'Đủ'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">
+                          {t('checkout.insufficientBalance')}
+                        </Badge>
+                      )}
+                    </div>
+                    {!canPayWithWallet && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => navigate('/account/topups')}
+                      >
+                        {t('checkout.topUp')}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
+                  size="lg"
+                  onClick={handleCheckout}
+                  disabled={!user || !canPayWithWallet || isProcessing}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      {t('checkout.processing')}
+                    </>
+                  ) : (
+                    <>
+                      {t('checkout.payWithWallet')}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </MainLayout>
+  );
+}

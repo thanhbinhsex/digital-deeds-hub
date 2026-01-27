@@ -57,8 +57,8 @@ const menuItems: NavItem[] = [
     ],
   },
   {
-    label: 'Purchase History',
-    labelVi: 'Lịch Sử Mua',
+    label: 'History',
+    labelVi: 'Lịch Sử',
     icon: ShoppingCart,
     children: [
       { label: 'Orders', labelVi: 'Đơn hàng', href: '/account/purchases' },

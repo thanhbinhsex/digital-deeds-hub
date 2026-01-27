@@ -48,6 +48,7 @@ interface Category {
   name: string;
   name_vi: string | null;
   slug: string;
+  icon: string | null;
 }
 
 const navItems: NavItem[] = [
@@ -81,7 +82,7 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
     const fetchCategories = async () => {
       const { data } = await supabase
         .from('categories')
-        .select('id, name, name_vi, slug')
+        .select('id, name, name_vi, slug, icon')
         .order('sort_order', { ascending: true });
       if (data) setCategories(data);
     };
@@ -89,18 +90,19 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   }, []);
 
   // Build dynamic software menu from categories
-  const softwareItem: NavItem = {
+  const softwareItem: NavItem & { categoryIcons?: Record<string, string | null> } = {
     label: 'Software',
     labelVi: 'Phần Mềm',
     icon: Package,
-    children: [
-      { label: 'All Software', labelVi: 'Tất cả phần mềm', href: '/products' },
-      ...categories.map(cat => ({
-        label: cat.name,
-        labelVi: cat.name_vi || cat.name,
-        href: `/products?category=${cat.slug}`,
-      })),
-    ],
+    children: categories.map(cat => ({
+      label: cat.name,
+      labelVi: cat.name_vi || cat.name,
+      href: `/products?category=${cat.slug}`,
+    })),
+    categoryIcons: categories.reduce((acc, cat) => {
+      acc[cat.slug] = cat.icon;
+      return acc;
+    }, {} as Record<string, string | null>),
   };
 
   const isActive = (href: string) => {
@@ -128,17 +130,24 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
             <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
           </button>
           {open && (
-            <div className="ml-8 mt-1 space-y-1">
-              {item.children.map((child) => (
-                <Link
-                  key={child.href}
-                  to={child.href}
-                  onClick={onClick}
-                  className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50"
-                >
-                  {lang === 'vi' ? child.labelVi : child.label}
-                </Link>
-              ))}
+            <div className="ml-4 mt-1 space-y-1">
+              {item.children.map((child) => {
+                const slug = child.href.split('category=')[1];
+                const iconUrl = (item as any).categoryIcons?.[slug];
+                return (
+                  <Link
+                    key={child.href}
+                    to={child.href}
+                    onClick={onClick}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50"
+                  >
+                    {iconUrl && (
+                      <img src={iconUrl} alt="" className="h-5 w-5 rounded object-cover" />
+                    )}
+                    {lang === 'vi' ? child.labelVi : child.label}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

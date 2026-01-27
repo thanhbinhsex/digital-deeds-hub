@@ -110,6 +110,23 @@ export default function CheckoutPage() {
 
       if (entitlementError) throw entitlementError;
 
+      // Send Telegram notification (fire and forget)
+      try {
+        await supabase.functions.invoke('send-telegram', {
+          body: {
+            type: 'order',
+            data: {
+              id: order.id,
+              amount: totalAmount,
+              userEmail: user.email,
+              items: items.map((item) => item.name),
+            },
+          },
+        });
+      } catch (e) {
+        console.error('Telegram notification failed:', e);
+      }
+
       return order;
     },
     onSuccess: () => {

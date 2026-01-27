@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { formatCurrency } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -83,11 +84,11 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const { totalItems } = useCart();
+  const { data: exchangeRate } = useExchangeRate();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-
   useEffect(() => {
     const fetchCategories = async () => {
       const { data } = await supabase
@@ -336,6 +337,16 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
           </Button>
 
           <div className="flex-1" />
+
+          {/* Exchange Rate Display */}
+          {exchangeRate && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/50 text-sm mr-2">
+              <span className="text-muted-foreground">1 USD =</span>
+              <span className="font-semibold text-foreground">
+                {exchangeRate.rate?.toLocaleString('vi-VN')} VND
+              </span>
+            </div>
+          )}
 
           {/* Cart Button */}
           <CartDrawer />

@@ -24,7 +24,6 @@ import {
   Wallet,
   Building2,
   Bitcoin,
-  MessageCircle,
   Menu,
   X,
   User,
@@ -33,6 +32,7 @@ import {
   Shield,
   Globe,
 } from 'lucide-react';
+import { FloatingContactButton } from './FloatingContactButton';
 
 interface NavItem {
   label: string;
@@ -173,23 +173,6 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Other Section */}
-        <div>
-          <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {lang === 'vi' ? 'KHÁC' : 'OTHER'}
-          </p>
-          <div className="space-y-1">
-            <Link
-              to="/contact"
-              onClick={onLinkClick}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <MessageCircle className="h-5 w-5" />
-              {lang === 'vi' ? 'Liên Hệ' : 'Contact'}
-              <ChevronDown className="h-4 w-4 ml-auto" />
-            </Link>
-          </div>
-        </div>
       </div>
     </ScrollArea>
   );
@@ -350,6 +333,9 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
           {children || <Outlet />}
         </main>
       </div>
+
+      {/* Floating Contact Button */}
+      <FloatingContactButton />
     </div>
   );
 }

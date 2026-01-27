@@ -1,0 +1,146 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { ProductCard } from '@/components/products/ProductCard';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Search, X } from 'lucide-react';
+
+export default function ProductsPage() {
+  const { t, lang } = useLanguage();
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: products, isLoading } = useQuery({
+    queryKey: ['products', search, selectedCategory],
+    queryFn: async () => {
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(name, name_vi)
+        `)
+        .eq('status', 'published')
+        .order('featured', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (selectedCategory) {
+        query = query.eq('category_id', selectedCategory);
+      }
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,name_vi.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  return (
+    <MainLayout>
+      <div className="container py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="font-display text-3xl font-bold md:text-4xl mb-4">
+            {t('nav.products')}
+          </h1>
+
+          {/* Search */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t('products.search')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                onClick={() => setSearch('')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Categories filter */}
+        {categories && categories.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-8">
+            <Badge
+              variant={selectedCategory === null ? 'default' : 'outline'}
+              className={`cursor-pointer ${
+                selectedCategory === null ? 'gradient-primary text-primary-foreground border-0' : ''
+              }`}
+              onClick={() => setSelectedCategory(null)}
+            >
+              {t('common.all')}
+            </Badge>
+            {categories.map((category) => (
+              <Badge
+                key={category.id}
+                variant={selectedCategory === category.id ? 'default' : 'outline'}
+                className={`cursor-pointer ${
+                  selectedCategory === category.id ? 'gradient-primary text-primary-foreground border-0' : ''
+                }`}
+                onClick={() => setSelectedCategory(category.id)}
+              >
+                {lang === 'vi' && category.name_vi ? category.name_vi : category.name}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Products grid */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="space-y-4">
+                <Skeleton className="aspect-[4/3] rounded-lg" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-9 w-9 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : products && products.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <p className="text-muted-foreground text-lg">{t('products.noResults')}</p>
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+}

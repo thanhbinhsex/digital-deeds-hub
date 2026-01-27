@@ -190,28 +190,47 @@ export function NewTopupPage() {
     if (!user) return;
     setIsLoading(true);
 
-    const { error } = await supabase.from('topup_requests').insert({
+    const { data: insertData, error } = await supabase.from('topup_requests').insert({
       user_id: user.id,
       amount: data.amount,
       method: data.method,
       reference: data.reference,
       note: data.note || null,
       status: 'pending',
-    });
-
-    setIsLoading(false);
+    }).select().single();
 
     if (error) {
+      setIsLoading(false);
       toast.error(t('common.error'));
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['topups'] });
-      toast.success(
-        lang === 'en'
-          ? 'Top-up request submitted! Please wait for admin approval.'
-          : 'Yêu cầu nạp tiền đã được gửi! Vui lòng chờ admin duyệt.'
-      );
-      navigate('/account/topups');
+      return;
     }
+
+    // Send Telegram notification (fire and forget)
+    try {
+      await supabase.functions.invoke('send-telegram', {
+        body: {
+          type: 'topup',
+          data: {
+            id: insertData.id,
+            amount: data.amount,
+            userEmail: user.email,
+            method: data.method,
+            reference: data.reference,
+          },
+        },
+      });
+    } catch (e) {
+      console.error('Telegram notification failed:', e);
+    }
+
+    setIsLoading(false);
+    queryClient.invalidateQueries({ queryKey: ['topups'] });
+    toast.success(
+      lang === 'en'
+        ? 'Top-up request submitted! Please wait for admin approval.'
+        : 'Yêu cầu nạp tiền đã được gửi! Vui lòng chờ admin duyệt.'
+    );
+    navigate('/account/topups');
   };
 
   return (

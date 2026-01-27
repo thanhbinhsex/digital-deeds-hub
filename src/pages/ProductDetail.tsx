@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,7 +39,7 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <SidebarLayout>
         <div className="container py-8">
           <div className="grid lg:grid-cols-2 gap-12">
             <Skeleton className="aspect-square rounded-2xl" />
@@ -52,13 +52,13 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
-      </MainLayout>
+      </SidebarLayout>
     );
   }
 
   if (error || !product) {
     return (
-      <MainLayout>
+      <SidebarLayout>
         <div className="container py-20 text-center">
           <h1 className="text-2xl font-bold mb-4">
             {lang === 'en' ? 'Product not found' : 'Không tìm thấy sản phẩm'}
@@ -68,7 +68,7 @@ export default function ProductDetailPage() {
             {t('common.back')}
           </Button>
         </div>
-      </MainLayout>
+      </SidebarLayout>
     );
   }
 
@@ -102,7 +102,7 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <MainLayout>
+    <SidebarLayout>
       <div className="container py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
@@ -225,6 +225,6 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </SidebarLayout>
   );
 }

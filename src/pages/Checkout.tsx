@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -144,7 +144,7 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <MainLayout>
+      <SidebarLayout>
         <div className="container py-20 text-center">
           <ShoppingBag className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h1 className="text-2xl font-bold mb-4">{t('cart.empty')}</h1>
@@ -152,12 +152,12 @@ export default function CheckoutPage() {
             {t('hero.cta')}
           </Button>
         </div>
-      </MainLayout>
+      </SidebarLayout>
     );
   }
 
   return (
-    <MainLayout>
+    <SidebarLayout>
       <div className="container py-8">
         <h1 className="font-display text-3xl font-bold mb-8">{t('checkout.title')}</h1>
 
@@ -314,6 +314,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </SidebarLayout>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,8 +54,8 @@ export default function SignupPage() {
   };
 
   return (
-    <MainLayout hideFooter>
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
+    <SidebarLayout>
+      <div className="min-h-full flex items-center justify-center p-4">
         {/* Background */}
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-primary/20 rounded-full blur-[100px]" />
@@ -178,6 +178,6 @@ export default function SignupPage() {
           </form>
         </Card>
       </div>
-    </MainLayout>
+    </SidebarLayout>
   );
 }

@@ -23,6 +23,8 @@ import {
   Code2,
   ShoppingCart,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Wallet,
   Building2,
   Bitcoin,
@@ -33,6 +35,8 @@ import {
   Settings,
   Shield,
   Globe,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react';
 import { FloatingContactButton } from './FloatingContactButton';
 import { CartDrawer } from '@/components/cart/CartDrawer';
@@ -81,6 +85,7 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   const { totalItems } = useCart();
   const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -218,21 +223,74 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card">
+      <aside 
+        className={cn(
+          "hidden lg:flex flex-col border-r border-border bg-card transition-all duration-300",
+          sidebarCollapsed ? "w-16" : "w-64"
+        )}
+      >
         {/* Logo */}
-        <div className="h-16 flex items-center px-4 border-b border-border">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-              M
-            </div>
-            <div>
-              <span className="font-display font-bold text-lg">MinMinTool</span>
-              <p className="text-xs text-muted-foreground">GROWN UP</p>
-            </div>
-          </Link>
+        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
+          {!sidebarCollapsed && (
+            <Link to="/" className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                M
+              </div>
+              <div>
+                <span className="font-display font-bold text-lg">MinMinTool</span>
+                <p className="text-xs text-muted-foreground">GROWN UP</p>
+              </div>
+            </Link>
+          )}
+          {sidebarCollapsed && (
+            <Link to="/" className="mx-auto">
+              <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                M
+              </div>
+            </Link>
+          )}
         </div>
 
-        <SidebarContent />
+        {/* Collapse Button */}
+        <div className="p-2 border-b border-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <>
+                <PanelLeftClose className="h-4 w-4 mr-2" />
+                <span>{lang === 'vi' ? 'Thu gọn' : 'Collapse'}</span>
+              </>
+            )}
+          </Button>
+        </div>
+
+        {!sidebarCollapsed && <SidebarContent />}
+        
+        {sidebarCollapsed && (
+          <div className="flex-1 p-2 space-y-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                to={item.href || '/'}
+                className={cn(
+                  'flex items-center justify-center p-2.5 rounded-lg transition-colors',
+                  isActive(item.href || '/')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+                title={lang === 'vi' ? item.labelVi : item.label}
+              >
+                <item.icon className="h-5 w-5" />
+              </Link>
+            ))}
+          </div>
+        )}
       </aside>
 
       {/* Mobile Sidebar Overlay */}

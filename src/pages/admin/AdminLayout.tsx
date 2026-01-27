@@ -19,6 +19,7 @@ import {
   X,
   Home,
   FolderOpen,
+  Newspaper,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -30,6 +31,7 @@ const adminLinks = [
   { path: '/admin/orders', icon: ShoppingCart, labelKey: 'admin.orders' },
   { path: '/admin/topups', icon: CreditCard, labelKey: 'admin.topups' },
   { path: '/admin/users', icon: Users, labelKey: 'admin.users' },
+  { path: '/admin/blog', icon: Newspaper, labelKey: 'admin.blog' },
   { path: '/admin/audit', icon: FileText, labelKey: 'admin.audit' },
 ];
 

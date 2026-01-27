@@ -53,6 +53,7 @@ interface Category {
 
 const navItems: NavItem[] = [
   { label: 'Home', labelVi: 'Trang Chủ', icon: Home, href: '/' },
+  { label: 'Blog', labelVi: 'Blog', icon: FileText, href: '/blog' },
 ];
 
 const historyItems: NavItem[] = [

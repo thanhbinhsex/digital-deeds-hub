@@ -13,6 +13,8 @@ import SignupPage from "./pages/Signup";
 import ProductsPage from "./pages/Products";
 import ProductDetailPage from "./pages/ProductDetail";
 import CheckoutPage from "./pages/Checkout";
+import BlogPage from "./pages/Blog";
+import BlogDetailPage from "./pages/BlogDetail";
 import AccountLayout from "./pages/account/AccountLayout";
 import ProfilePage from "./pages/account/ProfilePage";
 import WalletPage from "./pages/account/WalletPage";
@@ -26,6 +28,7 @@ import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
 import AdminTopupsPage from "./pages/admin/AdminTopupsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminAuditPage from "./pages/admin/AdminAuditPage";
+import AdminBlogPage from "./pages/admin/AdminBlogPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +49,8 @@ const App = () => (
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/p/:slug" element={<ProductDetailPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:slug" element={<BlogDetailPage />} />
                 <Route path="/account" element={<AccountLayout />}>
                   <Route index element={<ProfilePage />} />
                   <Route path="wallet" element={<WalletPage />} />
@@ -61,6 +66,7 @@ const App = () => (
                   <Route path="topups" element={<AdminTopupsPage />} />
                   <Route path="users" element={<AdminUsersPage />} />
                   <Route path="audit" element={<AdminAuditPage />} />
+                  <Route path="blog" element={<AdminBlogPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

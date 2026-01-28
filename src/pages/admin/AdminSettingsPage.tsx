@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Globe, CreditCard, Bell, Gift, Plus, Trash2, Megaphone, MessageCircle, ExternalLink } from 'lucide-react';
+import { Save, Globe, CreditCard, Gift, Plus, Trash2, Megaphone, MessageCircle, ExternalLink, Search } from 'lucide-react';
 
 interface SiteSetting {
   id: string;
@@ -82,26 +82,30 @@ export default function AdminSettingsPage() {
       <h1 className="text-xl font-bold">{lang === 'vi' ? 'Cài Đặt' : 'Settings'}</h1>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 h-auto">
-          <TabsTrigger value="general" className="text-xs px-2 py-2">
-            <Globe className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{lang === 'vi' ? 'Chung' : 'General'}</span>
+        <TabsList className="grid w-full grid-cols-6 h-auto">
+          <TabsTrigger value="general" className="text-xs px-1 py-2">
+            <Globe className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">{lang === 'vi' ? 'Chung' : 'General'}</span>
           </TabsTrigger>
-          <TabsTrigger value="banner" className="text-xs px-2 py-2">
-            <Megaphone className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">Banner</span>
+          <TabsTrigger value="seo" className="text-xs px-1 py-2">
+            <Search className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">SEO</span>
           </TabsTrigger>
-          <TabsTrigger value="contact" className="text-xs px-2 py-2">
-            <MessageCircle className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{lang === 'vi' ? 'Liên Hệ' : 'Contact'}</span>
+          <TabsTrigger value="banner" className="text-xs px-1 py-2">
+            <Megaphone className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">Banner</span>
           </TabsTrigger>
-          <TabsTrigger value="payment" className="text-xs px-2 py-2">
-            <CreditCard className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{lang === 'vi' ? 'Thanh Toán' : 'Payment'}</span>
+          <TabsTrigger value="contact" className="text-xs px-1 py-2">
+            <MessageCircle className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">{lang === 'vi' ? 'Liên Hệ' : 'Contact'}</span>
           </TabsTrigger>
-          <TabsTrigger value="promotion" className="text-xs px-2 py-2">
-            <Gift className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{lang === 'vi' ? 'Khuyến Mãi' : 'Promo'}</span>
+          <TabsTrigger value="payment" className="text-xs px-1 py-2">
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">{lang === 'vi' ? 'Thanh Toán' : 'Payment'}</span>
+          </TabsTrigger>
+          <TabsTrigger value="promotion" className="text-xs px-1 py-2">
+            <Gift className="h-4 w-4" />
+            <span className="hidden md:inline ml-1">{lang === 'vi' ? 'KM' : 'Promo'}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -109,6 +113,15 @@ export default function AdminSettingsPage() {
           <GeneralSettings 
             data={getSetting('general')} 
             onSave={(value) => updateMutation.mutate({ key: 'general', value })}
+            isPending={updateMutation.isPending}
+            lang={lang}
+          />
+        </TabsContent>
+
+        <TabsContent value="seo">
+          <SEOSettings 
+            data={getSetting('seo')} 
+            onSave={(value) => updateMutation.mutate({ key: 'seo', value })}
             isPending={updateMutation.isPending}
             lang={lang}
           />
@@ -158,7 +171,6 @@ function GeneralSettings({ data, onSave, isPending, lang }: { data: Record<strin
   const [form, setForm] = useState({
     site_name: data.site_name || 'VieTool',
     site_url: data.site_url || 'vietool.cc',
-    site_description: data.site_description || '',
     contact_email: data.contact_email || '',
     contact_phone: data.contact_phone || '',
   });
@@ -187,9 +199,84 @@ function GeneralSettings({ data, onSave, isPending, lang }: { data: Record<strin
             <Input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} className="h-9" />
           </div>
         </div>
+        <Button size="sm" onClick={() => onSave(form)} disabled={isPending}>
+          <Save className="h-4 w-4 mr-1" />
+          {isPending ? '...' : (lang === 'vi' ? 'Lưu' : 'Save')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SEOSettings({ data, onSave, isPending, lang }: { data: Record<string, any>; onSave: (value: Record<string, any>) => void; isPending: boolean; lang: string }) {
+  const [form, setForm] = useState({
+    meta_title: data.meta_title || 'VieTool - Công cụ marketing hiệu quả',
+    meta_description: data.meta_description || 'VieTool cung cấp các công cụ marketing, automation, phần mềm hỗ trợ kinh doanh online hiệu quả với giá tốt nhất.',
+    meta_keywords: data.meta_keywords || 'vietool, tool marketing, automation, phần mềm marketing, công cụ bán hàng, tool facebook, tool zalo',
+    og_image: data.og_image || '',
+    favicon_url: data.favicon_url || '',
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Search className="h-4 w-4 text-primary" />
+          SEO & Meta Tags
+        </CardTitle>
+        <CardDescription className="text-xs">
+          {lang === 'vi' ? 'Tối ưu hiển thị trên công cụ tìm kiếm' : 'Optimize for search engines'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
         <div className="space-y-1">
-          <Label className="text-xs">{lang === 'vi' ? 'Mô Tả' : 'Description'}</Label>
-          <Textarea value={form.site_description} onChange={e => setForm({ ...form, site_description: e.target.value })} rows={2} />
+          <Label className="text-xs">{lang === 'vi' ? 'Tiêu đề trang (Title)' : 'Page Title'}</Label>
+          <Input 
+            value={form.meta_title} 
+            onChange={e => setForm({ ...form, meta_title: e.target.value })} 
+            placeholder="VieTool - Công cụ marketing hiệu quả"
+            className="h-9" 
+          />
+          <p className="text-xs text-muted-foreground">{form.meta_title.length}/60 {lang === 'vi' ? 'ký tự' : 'characters'}</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{lang === 'vi' ? 'Mô tả (Description)' : 'Meta Description'}</Label>
+          <Textarea 
+            value={form.meta_description} 
+            onChange={e => setForm({ ...form, meta_description: e.target.value })} 
+            placeholder="Mô tả ngắn gọn về website..."
+            rows={2} 
+          />
+          <p className="text-xs text-muted-foreground">{form.meta_description.length}/160 {lang === 'vi' ? 'ký tự' : 'characters'}</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{lang === 'vi' ? 'Từ khóa (Keywords)' : 'Keywords'}</Label>
+          <Textarea 
+            value={form.meta_keywords} 
+            onChange={e => setForm({ ...form, meta_keywords: e.target.value })} 
+            placeholder="keyword1, keyword2, keyword3..."
+            rows={2} 
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs">OG Image URL</Label>
+            <Input 
+              value={form.og_image} 
+              onChange={e => setForm({ ...form, og_image: e.target.value })} 
+              placeholder="https://vietool.cc/og-image.png"
+              className="h-9" 
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Favicon URL</Label>
+            <Input 
+              value={form.favicon_url} 
+              onChange={e => setForm({ ...form, favicon_url: e.target.value })} 
+              placeholder="https://vietool.cc/favicon.ico"
+              className="h-9" 
+            />
+          </div>
         </div>
         <Button size="sm" onClick={() => onSave(form)} disabled={isPending}>
           <Save className="h-4 w-4 mr-1" />

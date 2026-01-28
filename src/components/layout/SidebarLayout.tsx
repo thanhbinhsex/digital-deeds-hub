@@ -456,13 +456,13 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/login">
-              <Button variant="ghost" className="flex items-center gap-2">
+            <Button variant="ghost" className="flex items-center gap-2" asChild>
+              <Link to="/login">
                 <User className="h-5 w-5" />
                 <span>{lang === 'vi' ? 'Chưa đăng nhập' : 'Login'}</span>
                 <ChevronDown className="h-4 w-4" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
         </header>
 

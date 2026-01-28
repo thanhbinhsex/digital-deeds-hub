@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify authentication
+    // Verify authentication using getClaims (faster, doesn't require active session)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -37,21 +37,24 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Create user client to verify auth
+    // Create client and verify JWT claims
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: userData, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !userData?.user) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error('Auth error:', claimsError?.message);
       return new Response(
         JSON.stringify({ success: false, error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = userData.user.id;
-    const userEmail = userData.user.email;
+    const userId = claimsData.claims.sub as string;
+    const userEmail = claimsData.claims.email as string;
 
     // Parse request
     const { items, couponId }: CheckoutRequest = await req.json();
@@ -186,16 +189,20 @@ Deno.serve(async (req) => {
 
     if (walletUpdateError) throw walletUpdateError;
 
-    // 8. Create entitlements
+    // 8. Create entitlements (skip if user already owns the product)
     const entitlements = verifiedItems.map(item => ({
       user_id: userId,
       product_id: item.productId,
       order_id: order.id,
     }));
 
+    // Use upsert with onConflict to handle duplicates gracefully
     const { error: entitlementError } = await supabase
       .from('entitlements')
-      .insert(entitlements);
+      .upsert(entitlements, { 
+        onConflict: 'user_id,product_id',
+        ignoreDuplicates: true 
+      });
 
     if (entitlementError) throw entitlementError;
 

@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -164,27 +163,27 @@ export default function AdminTopupsPage() {
     switch (status) {
       case 'pending':
         return (
-          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-            <Clock className="h-3 w-3 mr-1" />
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/30">
+            <Clock className="h-3 w-3" />
             {t('topup.pending')}
-          </Badge>
+          </span>
         );
       case 'approved':
         return (
-          <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/30">
+            <CheckCircle2 className="h-3 w-3" />
             {t('topup.approved')}
-          </Badge>
+          </span>
         );
       case 'denied':
         return (
-          <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
-            <XCircle className="h-3 w-3 mr-1" />
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/30">
+            <XCircle className="h-3 w-3" />
             {t('topup.denied')}
-          </Badge>
+          </span>
         );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-muted">{status}</span>;
     }
   };
 

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Globe, CreditCard, Bell, Settings, Gift, Plus, Trash2 } from 'lucide-react';
+import { Save, Globe, CreditCard, Bell, Settings, Gift, Plus, Trash2, Megaphone } from 'lucide-react';
 
 interface SiteSetting {
   id: string;
@@ -111,12 +111,20 @@ export default function AdminSettingsPage() {
 
         {/* General Settings */}
         <TabsContent value="general">
-          <GeneralSettings 
-            data={getSetting('general')} 
-            onSave={(value) => updateMutation.mutate({ key: 'general', value })}
-            isPending={updateMutation.isPending}
-            lang={lang}
-          />
+          <div className="space-y-6">
+            <GeneralSettings 
+              data={getSetting('general')} 
+              onSave={(value) => updateMutation.mutate({ key: 'general', value })}
+              isPending={updateMutation.isPending}
+              lang={lang}
+            />
+            <BannerSettings 
+              data={getSetting('banner')} 
+              onSave={(value) => updateMutation.mutate({ key: 'banner', value })}
+              isPending={updateMutation.isPending}
+              lang={lang}
+            />
+          </div>
         </TabsContent>
 
         {/* Payment Settings */}
@@ -199,6 +207,102 @@ function GeneralSettings({ data, onSave, isPending, lang }: { data: Record<strin
         <Button onClick={() => onSave(form)} disabled={isPending}>
           <Save className="h-4 w-4 mr-2" />
           {isPending ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...') : (lang === 'vi' ? 'Lưu Cài Đặt' : 'Save Settings')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BannerSettings({ data, onSave, isPending, lang }: { data: Record<string, any>; onSave: (value: Record<string, any>) => void; isPending: boolean; lang: string }) {
+  const [form, setForm] = useState({
+    title: data.title || '',
+    title_vi: data.title_vi || '',
+    description: data.description || '',
+    description_vi: data.description_vi || '',
+    button_text: data.button_text || 'View Products',
+    button_text_vi: data.button_text_vi || 'Xem sản phẩm',
+    button_link: data.button_link || '/products',
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Megaphone className="h-5 w-5 text-primary" />
+          {lang === 'vi' ? 'Nội Dung Thông Báo (Banner)' : 'Announcement Banner'}
+        </CardTitle>
+        <CardDescription>
+          {lang === 'vi' ? 'Chỉnh sửa nội dung hiển thị trên banner trang chủ' : 'Edit content displayed on homepage banner'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Tiêu đề (Tiếng Anh)' : 'Title (English)'}</Label>
+            <Input 
+              value={form.title} 
+              onChange={e => setForm({ ...form, title: e.target.value })} 
+              placeholder="Welcome to MinMinTool"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Tiêu đề (Tiếng Việt)' : 'Title (Vietnamese)'}</Label>
+            <Input 
+              value={form.title_vi} 
+              onChange={e => setForm({ ...form, title_vi: e.target.value })} 
+              placeholder="Chào mừng đến MinMinTool"
+            />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Mô tả (Tiếng Anh)' : 'Description (English)'}</Label>
+            <Textarea 
+              value={form.description} 
+              onChange={e => setForm({ ...form, description: e.target.value })} 
+              placeholder="Effective marketing tools for your business"
+              rows={2}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Mô tả (Tiếng Việt)' : 'Description (Vietnamese)'}</Label>
+            <Textarea 
+              value={form.description_vi} 
+              onChange={e => setForm({ ...form, description_vi: e.target.value })} 
+              placeholder="Công cụ marketing hiệu quả cho doanh nghiệp"
+              rows={2}
+            />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Nút bấm (EN)' : 'Button Text (EN)'}</Label>
+            <Input 
+              value={form.button_text} 
+              onChange={e => setForm({ ...form, button_text: e.target.value })} 
+              placeholder="View Products"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Nút bấm (VI)' : 'Button Text (VI)'}</Label>
+            <Input 
+              value={form.button_text_vi} 
+              onChange={e => setForm({ ...form, button_text_vi: e.target.value })} 
+              placeholder="Xem sản phẩm"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Link nút bấm' : 'Button Link'}</Label>
+            <Input 
+              value={form.button_link} 
+              onChange={e => setForm({ ...form, button_link: e.target.value })} 
+              placeholder="/products"
+            />
+          </div>
+        </div>
+        <Button onClick={() => onSave(form)} disabled={isPending}>
+          <Save className="h-4 w-4 mr-2" />
+          {isPending ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...') : (lang === 'vi' ? 'Lưu Nội Dung' : 'Save Content')}
         </Button>
       </CardContent>
     </Card>

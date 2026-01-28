@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency, formatDate } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, RefreshCw } from 'lucide-react';
+import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, RefreshCw, Gift, Sparkles } from 'lucide-react';
 
 const MIN_TOPUP = 10000;
 const MAX_TOPUP = 100000000;
@@ -25,6 +25,12 @@ const topupSchema = z.object({
 });
 
 type TopupForm = z.infer<typeof topupSchema>;
+
+interface TopupPromotion {
+  min_amount: number;
+  bonus_percent: number;
+  enabled: boolean;
+}
 
 // Bank info for auto topup
 const BANK_INFO = {
@@ -186,6 +192,21 @@ export function NewTopupPage() {
   const [createdTopup, setCreatedTopup] = useState<{ id: string; topup_code: string; amount: number } | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<number>(AMOUNT_PACKAGES[0].value);
 
+  // Fetch promotions from site_settings
+  const { data: promotions } = useQuery({
+    queryKey: ['topup-promotions'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'topup_promotion')
+        .single();
+      
+      const promos = (data?.value as { promotions?: TopupPromotion[] })?.promotions || [];
+      return promos.filter(p => p.enabled).sort((a, b) => a.min_amount - b.min_amount);
+    },
+  });
+
   const {
     register,
     handleSubmit,
@@ -200,6 +221,28 @@ export function NewTopupPage() {
   });
 
   const currentAmount = watch('amount');
+
+  // Calculate bonus for current amount
+  const calculateBonus = (amount: number): { percent: number; bonus: number } => {
+    if (!promotions || promotions.length === 0) return { percent: 0, bonus: 0 };
+    
+    // Find the highest tier that applies
+    let applicablePromo: TopupPromotion | null = null;
+    for (const promo of promotions) {
+      if (amount >= promo.min_amount) {
+        applicablePromo = promo;
+      }
+    }
+    
+    if (!applicablePromo) return { percent: 0, bonus: 0 };
+    
+    return {
+      percent: applicablePromo.bonus_percent,
+      bonus: Math.floor(amount * applicablePromo.bonus_percent / 100),
+    };
+  };
+
+  const currentBonus = calculateBonus(currentAmount || 0);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -394,6 +437,30 @@ export function NewTopupPage() {
         <h2 className="font-display text-xl font-bold">{t('topup.title')}</h2>
       </div>
 
+      {/* Promotion Banner */}
+      {promotions && promotions.length > 0 && (
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Gift className="h-5 w-5 text-success" />
+              <h3 className="font-semibold text-success">
+                {lang === 'vi' ? 'Khuyến mãi nạp tiền' : 'Top-up Promotions'}
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {promotions.map((promo, idx) => (
+                <div key={idx} className="bg-background rounded-lg p-2 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    {lang === 'vi' ? 'Từ' : 'From'} {formatCurrency(promo.min_amount, 'VND', lang)}
+                  </p>
+                  <p className="font-bold text-success">+{promo.bonus_percent}%</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{lang === 'en' ? 'Select Amount' : 'Chọn số tiền'}</CardTitle>
@@ -433,15 +500,33 @@ export function NewTopupPage() {
               )}
             </div>
 
-            {/* Preview amount */}
+            {/* Preview amount with bonus */}
             {currentAmount >= MIN_TOPUP && (
-              <div className="p-3 bg-muted rounded-lg text-center">
-                <p className="text-xs text-muted-foreground mb-1">
+              <div className="p-3 bg-muted rounded-lg text-center space-y-2">
+                <p className="text-xs text-muted-foreground">
                   {lang === 'en' ? 'Amount' : 'Số tiền nạp'}
                 </p>
                 <p className="text-xl font-bold text-primary">
                   {formatCurrency(currentAmount, 'VND', lang)}
                 </p>
+                {currentBonus.bonus > 0 && (
+                  <div className="flex items-center justify-center gap-2 text-success">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="font-semibold">
+                      +{formatCurrency(currentBonus.bonus, 'VND', lang)} ({currentBonus.percent}% {lang === 'vi' ? 'bonus' : 'bonus'})
+                    </span>
+                  </div>
+                )}
+                {currentBonus.bonus > 0 && (
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      {lang === 'vi' ? 'Tổng nhận được' : 'Total received'}
+                    </p>
+                    <p className="text-lg font-bold text-primary">
+                      {formatCurrency(currentAmount + currentBonus.bonus, 'VND', lang)}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Eye, Package } from 'lucide-react';
-import { HeroCarousel } from './HeroCarousel';
+import { AnnouncementBanner } from './AnnouncementBanner';
 
 export function HomeContent() {
   const { t, lang } = useLanguage();
@@ -55,8 +55,8 @@ export function HomeContent() {
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      {/* Hero Carousel */}
-      <HeroCarousel />
+      {/* Announcement Banner */}
+      <AnnouncementBanner />
 
       {/* Category Tabs */}
       <ScrollArea className="w-full">

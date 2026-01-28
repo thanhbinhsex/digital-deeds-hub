@@ -47,6 +47,7 @@ const productSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']),
   featured: z.boolean().default(false),
   image_url: z.string().optional(),
+  nhhtool_id: z.string().optional(),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -117,6 +118,7 @@ export default function AdminProductsPage() {
         status: data.status as 'draft' | 'published' | 'archived',
         featured: data.featured,
         image_url: data.image_url || null,
+        nhhtool_id: data.nhhtool_id || null,
       };
       const { error } = await supabase.from('products').insert(insertData);
       if (error) throw error;
@@ -141,6 +143,7 @@ export default function AdminProductsPage() {
           ...rest,
           category_id: rest.category_id || null,
           original_price: rest.original_price || null,
+          nhhtool_id: rest.nhhtool_id || null,
         })
         .eq('id', id);
       if (error) throw error;
@@ -187,6 +190,7 @@ export default function AdminProductsPage() {
       status: product.status,
       featured: product.featured || false,
       image_url: product.image_url || '',
+      nhhtool_id: product.nhhtool_id || '',
     });
     setIsDialogOpen(true);
   };
@@ -207,6 +211,7 @@ export default function AdminProductsPage() {
       status: 'draft',
       featured: false,
       image_url: '',
+      nhhtool_id: '',
     });
     setIsDialogOpen(true);
   };
@@ -340,9 +345,15 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input {...register('image_url')} placeholder="https://..." />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Image URL</Label>
+                  <Input {...register('image_url')} placeholder="https://..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>NHHTool ID</Label>
+                  <Input {...register('nhhtool_id')} placeholder="ID sản phẩm từ nhhtool.id.vn" />
+                </div>
               </div>
 
               <div className="flex items-center gap-2">

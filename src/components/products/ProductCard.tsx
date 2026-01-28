@@ -3,10 +3,8 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useCart } from '@/contexts/CartContext';
 import { formatCurrency } from '@/lib/i18n';
-import { ShoppingCart, Star, Zap } from 'lucide-react';
-import { toast } from 'sonner';
+import { Star, Zap, ArrowRight } from 'lucide-react';
 
 interface ProductCardProps {
   product: {
@@ -29,7 +27,6 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { t, lang } = useLanguage();
-  const { addItem } = useCart();
 
   const name = lang === 'vi' && product.name_vi ? product.name_vi : product.name;
   const categoryName = product.category
@@ -42,19 +39,6 @@ export function ProductCard({ product }: ProductCardProps) {
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / product.original_price!) * 100)
     : 0;
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addItem({
-      productId: product.id,
-      name: product.name,
-      nameVi: product.name_vi || undefined,
-      price: product.price,
-      imageUrl: product.image_url || undefined,
-    });
-    toast.success(lang === 'en' ? 'Added to cart!' : 'Đã thêm vào giỏ hàng!');
-  };
 
   return (
     <Link to={`/p/${product.slug}`}>
@@ -114,10 +98,9 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
           <Button
             size="sm"
-            onClick={handleAddToCart}
             className="gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
           >
-            <ShoppingCart className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" />
           </Button>
         </CardFooter>
       </Card>

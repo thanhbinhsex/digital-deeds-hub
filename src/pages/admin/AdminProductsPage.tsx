@@ -97,7 +97,7 @@ export default function AdminProductsPage() {
     defaultValues: {
       status: 'draft',
       featured: false,
-      currency: 'USD',
+      currency: 'VND',
       price: 0,
     },
   });
@@ -206,7 +206,7 @@ export default function AdminProductsPage() {
       short_description: '',
       price: 0,
       original_price: undefined,
-      currency: 'USD',
+      currency: 'VND',
       category_id: '',
       status: 'draft',
       featured: false,
@@ -289,27 +289,15 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Price (cents)</Label>
+                  <Label>Price (VND)</Label>
                   <Input type="number" {...register('price', { valueAsNumber: true })} />
                   {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Original Price</Label>
+                  <Label>Original Price (VND)</Label>
                   <Input type="number" {...register('original_price', { valueAsNumber: true })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={watch('currency')} onValueChange={(v) => setValue('currency', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="VND">VND</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 

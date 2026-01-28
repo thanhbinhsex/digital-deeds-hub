@@ -12,7 +12,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useExchangeRate, convertCurrency } from '@/hooks/useExchangeRate';
 import { useNhhtoolBuyTool } from '@/hooks/useNhhtoolApi';
 import { formatCurrency } from '@/lib/i18n';
 import { toast } from 'sonner';
@@ -47,14 +46,11 @@ export default function ProductDetailPage() {
   const { t, lang } = useLanguage();
   const { addItem } = useCart();
   const { user } = useAuth();
-  const { data: exchangeRate } = useExchangeRate();
   const buyToolMutation = useNhhtoolBuyTool();
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-
-  const rate = exchangeRate?.rate || 25000;
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', slug],
@@ -118,8 +114,8 @@ export default function ProductDetailPage() {
       // Check minimum order
       if (product && data.min_order_amount > product.price) {
         throw new Error(lang === 'vi' 
-          ? `Đơn hàng tối thiểu ${formatCurrency(data.min_order_amount, 'USD', lang)}` 
-          : `Minimum order ${formatCurrency(data.min_order_amount, 'USD', lang)}`
+          ? `Đơn hàng tối thiểu ${formatCurrency(data.min_order_amount, 'VND', lang)}` 
+          : `Minimum order ${formatCurrency(data.min_order_amount, 'VND', lang)}`
         );
       }
 
@@ -205,7 +201,6 @@ export default function ProductDetailPage() {
       : product.category.name
     : null;
 
-  const vndPrice = convertCurrency(finalPrice, rate);
   const shortId = product.id.split('-')[0].toUpperCase();
   const viewCount = (product as any).view_count || 0;
   const nhhtoolId = (product as any).nhhtool_id;
@@ -325,14 +320,11 @@ export default function ProductDetailPage() {
                       <strong>{lang === 'vi' ? 'Giá bán' : 'Price'}:</strong>{' '}
                       {discountAmount > 0 && (
                         <span className="line-through text-muted-foreground mr-2">
-                          {formatCurrency(product.price, 'USD', lang)}
+                          {formatCurrency(product.price, 'VND', lang)}
                         </span>
                       )}
                       <span className="text-primary font-bold">
-                        {vndPrice.toLocaleString('vi-VN')}VND
-                      </span>
-                      <span className="text-muted-foreground ml-1">
-                        ({formatCurrency(finalPrice, 'USD', lang)})
+                        {formatCurrency(finalPrice, 'VND', lang)}
                       </span>
                     </span>
                   </li>
@@ -340,7 +332,7 @@ export default function ProductDetailPage() {
                     <li className="flex items-start gap-2">
                       <span className="text-green-500">•</span>
                       <span className="text-green-600 font-medium">
-                        {lang === 'vi' ? 'Tiết kiệm' : 'You save'}: {formatCurrency(discountAmount, 'USD', lang)}
+                        {lang === 'vi' ? 'Tiết kiệm' : 'You save'}: {formatCurrency(discountAmount, 'VND', lang)}
                       </span>
                     </li>
                   )}
@@ -372,7 +364,7 @@ export default function ProductDetailPage() {
                       <Badge variant="secondary" className="text-green-600">
                         -{appliedCoupon.discount_type === 'percentage' 
                           ? `${appliedCoupon.discount_value}%` 
-                          : formatCurrency(appliedCoupon.discount_value, 'USD', lang)}
+                          : formatCurrency(appliedCoupon.discount_value, 'VND', lang)}
                       </Badge>
                       <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={removeCoupon}>
                         <X className="h-4 w-4" />

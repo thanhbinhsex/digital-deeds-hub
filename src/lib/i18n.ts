@@ -68,6 +68,9 @@ const translations = {
     'topup.approved': 'Approved',
     'topup.denied': 'Denied',
     'topup.history': 'Top Up History',
+    'topup.code': 'Transfer Code',
+    'topup.bankInfo': 'Bank Info',
+    'topup.autoApprove': 'Auto-approve when transfer detected',
 
     // Auth
     'auth.login': 'Login',
@@ -112,6 +115,7 @@ const translations = {
     'admin.deny': 'Deny',
     'admin.addProduct': 'Add Product',
     'admin.editProduct': 'Edit Product',
+    'admin.checkBank': 'Check Bank',
 
     // Common
     'common.save': 'Save',
@@ -200,6 +204,9 @@ const translations = {
     'topup.approved': 'Đã duyệt',
     'topup.denied': 'Từ chối',
     'topup.history': 'Lịch sử nạp tiền',
+    'topup.code': 'Mã chuyển khoản',
+    'topup.bankInfo': 'Thông tin ngân hàng',
+    'topup.autoApprove': 'Tự động duyệt khi phát hiện chuyển khoản',
 
     // Auth
     'auth.login': 'Đăng nhập',
@@ -244,6 +251,7 @@ const translations = {
     'admin.deny': 'Từ chối',
     'admin.addProduct': 'Thêm sản phẩm',
     'admin.editProduct': 'Sửa sản phẩm',
+    'admin.checkBank': 'Kiểm tra Bank',
 
     // Common
     'common.save': 'Lưu',
@@ -279,23 +287,15 @@ export function useTranslations(lang: Language = 'en') {
   };
 }
 
-// Format currency
-export function formatCurrency(cents: number, currency: string = 'USD', lang: Language = 'en'): string {
-  const amount = cents / 100;
+// Format currency - VND only (stored as VND integer, not cents)
+export function formatCurrency(amount: number, _currency: string = 'VND', lang: Language = 'en'): string {
   const locale = lang === 'vi' ? 'vi-VN' : 'en-US';
-  
-  if (currency === 'VND') {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0,
-    }).format(amount * 100); // VND doesn't use cents
-  }
   
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
+    currency: 'VND',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 

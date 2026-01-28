@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.verify-topup]
 verify_jwt = false
+
+[functions.checkout]
+verify_jwt = false

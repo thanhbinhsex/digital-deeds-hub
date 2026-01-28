@@ -44,31 +44,51 @@ export default function DashboardPage() {
   const { data: recentOrders } = useQuery({
     queryKey: ['recent-orders'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: ordersData } = await supabase
         .from('orders')
-        .select(`
-          *,
-          profile:profiles!orders_user_id_fkey(full_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
-      return data || [];
+      
+      if (!ordersData) return [];
+      
+      // Fetch profiles separately
+      const userIds = [...new Set(ordersData.map(o => o.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .in('user_id', userIds);
+      
+      return ordersData.map(order => ({
+        ...order,
+        profile: profiles?.find(p => p.user_id === order.user_id)
+      }));
     },
   });
 
   const { data: recentTopups } = useQuery({
     queryKey: ['recent-topups'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: topupsData } = await supabase
         .from('topup_requests')
-        .select(`
-          *,
-          profile:profiles!topup_requests_user_id_fkey(full_name, email)
-        `)
+        .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(5);
-      return data || [];
+      
+      if (!topupsData) return [];
+      
+      // Fetch profiles separately
+      const userIds = [...new Set(topupsData.map(t => t.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .in('user_id', userIds);
+      
+      return topupsData.map(topup => ({
+        ...topup,
+        profile: profiles?.find(p => p.user_id === topup.user_id)
+      }));
     },
   });
 

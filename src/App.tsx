@@ -5,14 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { CartProvider } from "@/contexts/CartContext";
 
 import Index from "./pages/Index";
 import LoginPage from "./pages/Login";
 import SignupPage from "./pages/Signup";
 import ProductsPage from "./pages/Products";
 import ProductDetailPage from "./pages/ProductDetail";
-import CheckoutPage from "./pages/Checkout";
 import BlogPage from "./pages/Blog";
 import BlogDetailPage from "./pages/BlogDetail";
 import AccountLayout from "./pages/account/AccountLayout";
@@ -40,9 +38,8 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
       <AuthProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
+        <TooltipProvider>
+          <Toaster />
             <Sonner />
             <BrowserRouter>
               <Routes>
@@ -51,7 +48,6 @@ const App = () => (
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/p/:slug" element={<ProductDetailPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogDetailPage />} />
                 <Route path="/account" element={<AccountLayout />}>
@@ -77,8 +73,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
-        </CartProvider>
+        </TooltipProvider>
       </AuthProvider>
     </LanguageProvider>
   </QueryClientProvider>

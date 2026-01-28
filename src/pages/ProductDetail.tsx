@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { formatCurrency } from '@/lib/i18n';
@@ -28,6 +27,7 @@ import {
   ChevronUp,
   Loader2,
   X,
+  Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -43,13 +43,14 @@ export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
-  const { addItem } = useCart();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', slug],
@@ -69,6 +70,23 @@ export default function ProductDetailPage() {
       return data;
     },
     enabled: !!slug,
+  });
+
+  // Fetch wallet balance
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
   });
 
   // Track view count
@@ -155,6 +173,66 @@ export default function ProductDetailPage() {
 
   const discountAmount = calculateDiscount();
   const finalPrice = product ? product.price - discountAmount : 0;
+  const canPayWithWallet = wallet && wallet.balance >= finalPrice;
+
+  // Handle direct purchase
+  const handleBuyNow = async () => {
+    if (!user) {
+      toast.error(lang === 'vi' ? 'Vui lòng đăng nhập' : 'Please login first');
+      navigate('/login');
+      return;
+    }
+
+    if (!agreedTerms) {
+      toast.error(lang === 'vi' ? 'Vui lòng đồng ý với điều khoản' : 'Please agree to the terms');
+      return;
+    }
+
+    if (!canPayWithWallet) {
+      toast.error(lang === 'vi' ? 'Số dư ví không đủ' : 'Insufficient wallet balance');
+      return;
+    }
+
+    if (!product) return;
+
+    setIsPurchasing(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('checkout', {
+        body: {
+          items: [{
+            productId: product.id,
+            name: product.name,
+            nameVi: product.name_vi,
+            price: finalPrice,
+            quantity: 1,
+          }],
+          couponId: appliedCoupon?.id,
+          discountAmount,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Checkout failed');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Checkout failed');
+      }
+
+      // Success
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(lang === 'vi' ? 'Mua hàng thành công!' : 'Purchase successful!');
+      navigate('/account/purchases');
+    } catch (error) {
+      console.error('Purchase error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(errorMessage);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -202,28 +280,6 @@ export default function ProductDetailPage() {
 
   const shortId = product.id.split('-')[0].toUpperCase();
   const viewCount = (product as any).view_count || 0;
-  
-
-  const handleAddToCart = () => {
-    addItem({
-      productId: product.id,
-      name: product.name,
-      nameVi: product.name_vi || undefined,
-      price: finalPrice,
-      imageUrl: product.image_url || undefined,
-    });
-    toast.success(lang === 'en' ? 'Added to cart!' : 'Đã thêm vào giỏ hàng!');
-  };
-
-  const handleBuyNow = () => {
-    if (!agreedTerms) {
-      toast.error(lang === 'vi' ? 'Vui lòng đồng ý với điều khoản' : 'Please agree to the terms');
-      return;
-    }
-    handleAddToCart();
-    navigate('/checkout');
-  };
-
 
   return (
     <SidebarLayout>
@@ -321,6 +377,31 @@ export default function ProductDetailPage() {
                   )}
                 </ul>
 
+                {/* Wallet Balance Info */}
+                {user && wallet && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        <span className="text-sm">{lang === 'vi' ? 'Số dư ví' : 'Wallet'}</span>
+                      </div>
+                      <span className="font-bold">{formatCurrency(wallet.balance, 'VND', lang)}</span>
+                    </div>
+                    {!canPayWithWallet && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => navigate('/account/topups/new?method=bank')}
+                        >
+                          {lang === 'vi' ? 'Nạp tiền' : 'Top up'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Coupon Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-orange-500">
@@ -375,17 +456,22 @@ export default function ProductDetailPage() {
                   </label>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Button */}
                 <div className="space-y-3">
-
-                  {/* Standard Checkout Button */}
                   <Button
                     size="lg"
                     onClick={handleBuyNow}
-                    disabled={!agreedTerms}
+                    disabled={!agreedTerms || isPurchasing || !canPayWithWallet}
                     className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-500 text-white font-bold text-lg shadow-lg"
                   >
-                    {lang === 'vi' ? 'Thanh Toán' : 'Checkout'}
+                    {isPurchasing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {lang === 'vi' ? 'Đang xử lý...' : 'Processing...'}
+                      </>
+                    ) : (
+                      lang === 'vi' ? 'Mua Ngay' : 'Buy Now'
+                    )}
                   </Button>
                 </div>
 

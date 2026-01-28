@@ -20,6 +20,7 @@ import ProfilePage from "./pages/account/ProfilePage";
 import WalletPage from "./pages/account/WalletPage";
 import TopupsPage, { NewTopupPage } from "./pages/account/TopupsPage";
 import PurchasesPage from "./pages/account/PurchasesPage";
+import NhhtoolPage from "./pages/account/NhhtoolPage";
 import AdminLayout from "./pages/admin/AdminLayout";
 import DashboardPage from "./pages/admin/DashboardPage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";
@@ -59,6 +60,7 @@ const App = () => (
                   <Route path="purchases" element={<PurchasesPage />} />
                   <Route path="topups" element={<TopupsPage />} />
                   <Route path="topups/new" element={<NewTopupPage />} />
+                  <Route path="nhhtool" element={<NhhtoolPage />} />
                 </Route>
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<DashboardPage />} />

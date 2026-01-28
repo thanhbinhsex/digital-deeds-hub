@@ -72,7 +72,6 @@ const historyItems: NavItem[] = [
     children: [
       { label: 'Orders', labelVi: 'Đơn hàng', href: '/account/purchases' },
       { label: 'Top-up History', labelVi: 'Lịch sử nạp tiền', href: '/account/topups' },
-      { label: 'NHHTool', labelVi: 'NHHTool', href: '/account/nhhtool' },
     ],
   },
 ];

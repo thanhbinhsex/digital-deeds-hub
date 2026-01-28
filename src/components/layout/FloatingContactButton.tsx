@@ -1,4 +1,5 @@
 import { useState, useEffect, forwardRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +13,11 @@ export const FloatingContactButton = forwardRef<HTMLDivElement, object>(
   function FloatingContactButton(_, ref) {
     const [isOpen, setIsOpen] = useState(false);
     const [contacts, setContacts] = useState<ContactSettings>({});
+    const location = useLocation();
+
+    // Hide on login/signup pages
+    const hiddenPaths = ['/login', '/signup', '/forgot-password'];
+    const shouldHide = hiddenPaths.includes(location.pathname);
 
     useEffect(() => {
       const fetchContacts = async () => {
@@ -32,9 +38,9 @@ export const FloatingContactButton = forwardRef<HTMLDivElement, object>(
       fetchContacts();
     }, []);
 
-    // Don't render if no contacts configured
+    // Don't render if no contacts configured or on hidden paths
     const hasContacts = contacts.telegram_url || contacts.zalo_url;
-    if (!hasContacts) return null;
+    if (!hasContacts || shouldHide) return null;
 
     return (
       <div ref={ref} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">

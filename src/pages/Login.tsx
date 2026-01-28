@@ -122,7 +122,7 @@ export default function LoginPage() {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
+            <CardFooter className="flex flex-col space-y-4 pb-8">
               <Button
                 type="submit"
                 className="w-full gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
@@ -131,9 +131,9 @@ export default function LoginPage() {
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t('auth.login')}
               </Button>
-              <p className="text-sm text-center text-muted-foreground">
+              <p className="text-sm text-center text-muted-foreground pb-4">
                 {t('auth.noAccount')}{' '}
-                <Link to="/signup" className="text-primary hover:underline font-medium">
+                <Link to="/signup" className="text-primary hover:underline font-medium relative z-[60]">
                   {t('auth.signup')}
                 </Link>
               </p>

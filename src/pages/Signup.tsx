@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,10 +27,17 @@ const signupSchema = z.object({
 type SignupForm = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
-  const { signUp } = useAuth();
+  const { user, loading, signUp } = useAuth();
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, loading, navigate]);
 
   const {
     register,
@@ -52,6 +59,11 @@ export default function SignupPage() {
       navigate('/');
     }
   };
+
+  // Show nothing while checking auth or if already logged in
+  if (loading || user) {
+    return null;
+  }
 
   return (
     <SidebarLayout>

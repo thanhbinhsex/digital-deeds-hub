@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useExchangeRate, convertCurrency } from '@/hooks/useExchangeRate';
 import { formatCurrency } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +10,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetFooter,
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -24,9 +22,6 @@ interface CartDrawerProps {
 export function CartDrawer({ children }: CartDrawerProps) {
   const { items, removeItem, updateQuantity, totalItems, totalAmount } = useCart();
   const { t, lang } = useLanguage();
-  const { data: exchangeRate } = useExchangeRate();
-
-  const rate = exchangeRate?.rate || 25000;
 
   return (
     <Sheet>
@@ -71,18 +66,12 @@ export function CartDrawer({ children }: CartDrawerProps) {
               <div className="space-y-4 py-4">
                 {items.map((item) => {
                   const name = lang === 'vi' && item.nameVi ? item.nameVi : item.name;
-                  const vndPrice = convertCurrency(item.price * item.quantity, rate);
 
                   return (
                     <div key={item.id} className="flex gap-3">
-                      {/* Image */}
                       <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={name}
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={item.imageUrl} alt={name} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
                             <ShoppingBag className="h-6 w-6 text-primary/50" />
@@ -90,17 +79,12 @@ export function CartDrawer({ children }: CartDrawerProps) {
                         )}
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm truncate">{name}</h4>
                         <div className="text-sm text-muted-foreground">
-                          {formatCurrency(item.price, 'USD', lang)}
-                          <span className="text-xs ml-1">
-                            (~{vndPrice.toLocaleString('vi-VN')}₫)
-                          </span>
+                          {formatCurrency(item.price, 'VND', lang)}
                         </div>
 
-                        {/* Quantity controls */}
                         <div className="flex items-center gap-2 mt-1">
                           <Button
                             variant="outline"
@@ -122,10 +106,9 @@ export function CartDrawer({ children }: CartDrawerProps) {
                         </div>
                       </div>
 
-                      {/* Price & Remove */}
                       <div className="text-right">
                         <p className="font-semibold text-sm">
-                          {formatCurrency(item.price * item.quantity, 'USD', lang)}
+                          {formatCurrency(item.price * item.quantity, 'VND', lang)}
                         </p>
                         <Button
                           variant="ghost"
@@ -145,23 +128,9 @@ export function CartDrawer({ children }: CartDrawerProps) {
             <div className="pt-4 space-y-4">
               <Separator />
               
-              {/* Totals */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t('cart.total')} (USD)</span>
-                  <span className="font-semibold">{formatCurrency(totalAmount, 'USD', lang)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t('cart.total')} (VND)</span>
-                  <span className="font-semibold text-primary">
-                    ~{convertCurrency(totalAmount, rate).toLocaleString('vi-VN')}₫
-                  </span>
-                </div>
-                {exchangeRate?.date && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    {lang === 'vi' ? 'Tỷ giá' : 'Rate'}: 1 USD = {rate.toLocaleString('vi-VN')}₫
-                  </p>
-                )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('cart.total')}</span>
+                <span className="font-bold text-lg">{formatCurrency(totalAmount, 'VND', lang)}</span>
               </div>
 
               <SheetTrigger asChild>

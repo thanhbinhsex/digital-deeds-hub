@@ -29,14 +29,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency, formatDate } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { Check, X, Clock, CheckCircle2, XCircle, Loader2, Search, Eye } from 'lucide-react';
+import { Check, X, Clock, CheckCircle2, XCircle, Loader2, Search, Eye, RefreshCw } from 'lucide-react';
 
 export default function AdminTopupsPage() {
-  const { session } = useAuth();
   const { t, lang } = useLanguage();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -44,6 +42,7 @@ export default function AdminTopupsPage() {
   const [selectedTopup, setSelectedTopup] = useState<any>(null);
   const [adminNote, setAdminNote] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'deny' | null>(null);
+  const [isCheckingBank, setIsCheckingBank] = useState(false);
 
   const { data: topups, isLoading } = useQuery({
     queryKey: ['admin-topups', statusFilter, search],
@@ -58,7 +57,7 @@ export default function AdminTopupsPage() {
       }
 
       if (search) {
-        query = query.ilike('reference', `%${search}%`);
+        query = query.or(`topup_code.ilike.%${search}%,reference.ilike.%${search}%`);
       }
 
       const { data: topupsData, error } = await query;
@@ -111,6 +110,41 @@ export default function AdminTopupsPage() {
     },
   });
 
+  const handleCheckBank = async () => {
+    setIsCheckingBank(true);
+    try {
+      const response = await supabase.functions.invoke('check-bank-topup');
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.success) {
+        const approvedCount = response.data.results?.filter((r: any) => r.matched)?.length || 0;
+        if (approvedCount > 0) {
+          toast.success(
+            lang === 'en' 
+              ? `Auto-approved ${approvedCount} topup(s)!` 
+              : `Đã tự động duyệt ${approvedCount} yêu cầu!`
+          );
+          queryClient.invalidateQueries({ queryKey: ['admin-topups'] });
+        } else {
+          toast.info(
+            lang === 'en' 
+              ? 'No matching transactions found' 
+              : 'Không tìm thấy giao dịch khớp'
+          );
+        }
+      } else {
+        throw new Error(response.data?.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      toast.error(error.message || t('common.error'));
+    } finally {
+      setIsCheckingBank(false);
+    }
+  };
+
   const handleAction = (topup: any, action: 'approve' | 'deny') => {
     setSelectedTopup(topup);
     setActionType(action);
@@ -156,14 +190,28 @@ export default function AdminTopupsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold">{t('admin.topups')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl font-bold">{t('admin.topups')}</h1>
+        <Button 
+          onClick={handleCheckBank} 
+          disabled={isCheckingBank}
+          className="gradient-primary text-primary-foreground"
+        >
+          {isCheckingBank ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          {t('admin.checkBank')}
+        </Button>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={lang === 'en' ? 'Search by reference...' : 'Tìm theo mã tham chiếu...'}
+            placeholder={lang === 'en' ? 'Search by code...' : 'Tìm theo mã...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -190,8 +238,7 @@ export default function AdminTopupsPage() {
               <TableRow>
                 <TableHead>{lang === 'en' ? 'User' : 'Người dùng'}</TableHead>
                 <TableHead>{t('topup.amount')}</TableHead>
-                <TableHead>{t('topup.method')}</TableHead>
-                <TableHead>{t('topup.reference')}</TableHead>
+                <TableHead>{t('topup.code')}</TableHead>
                 <TableHead>{t('common.status')}</TableHead>
                 <TableHead>{t('common.date')}</TableHead>
                 <TableHead className="text-right">{t('common.actions')}</TableHead>
@@ -204,7 +251,6 @@ export default function AdminTopupsPage() {
                     <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 ml-auto" /></TableCell>
@@ -225,13 +271,12 @@ export default function AdminTopupsPage() {
                     </TableCell>
                     <TableCell>
                       <span className="font-semibold text-success">
-                        +{formatCurrency(topup.amount, 'USD', lang)}
+                        +{formatCurrency(topup.amount, 'VND', lang)}
                       </span>
                     </TableCell>
-                    <TableCell>{topup.method}</TableCell>
                     <TableCell>
-                      <code className="text-sm bg-muted px-2 py-1 rounded">
-                        {topup.reference || '-'}
+                      <code className="text-sm bg-primary/10 text-primary px-2 py-1 rounded font-bold">
+                        {topup.topup_code || '-'}
                       </code>
                     </TableCell>
                     <TableCell>{getStatusBadge(topup.status)}</TableCell>
@@ -280,7 +325,7 @@ export default function AdminTopupsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {lang === 'en' ? 'No topup requests' : 'Không có yêu cầu nạp tiền'}
                   </TableCell>
                 </TableRow>
@@ -311,16 +356,14 @@ export default function AdminTopupsPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('topup.amount')}</span>
                   <span className="font-semibold text-success">
-                    +{formatCurrency(selectedTopup.amount, 'USD', lang)}
+                    +{formatCurrency(selectedTopup.amount, 'VND', lang)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('topup.method')}</span>
-                  <span>{selectedTopup.method}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('topup.reference')}</span>
-                  <code className="bg-muted px-2 py-0.5 rounded text-sm">{selectedTopup.reference}</code>
+                  <span className="text-muted-foreground">{t('topup.code')}</span>
+                  <code className="bg-primary/10 text-primary px-2 py-0.5 rounded text-sm font-bold">
+                    {selectedTopup.topup_code}
+                  </code>
                 </div>
                 {selectedTopup.note && (
                   <div>
@@ -379,20 +422,24 @@ export default function AdminTopupsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('topup.amount')}</span>
-                  <span className="font-semibold">{formatCurrency(selectedTopup.amount, 'USD', lang)}</span>
+                  <span className="font-semibold">{formatCurrency(selectedTopup.amount, 'VND', lang)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('common.status')}</span>
                   {getStatusBadge(selectedTopup.status)}
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('topup.method')}</span>
-                  <span>{selectedTopup.method}</span>
+                  <span className="text-muted-foreground">{t('topup.code')}</span>
+                  <code className="bg-primary/10 text-primary px-2 py-0.5 rounded text-sm font-bold">
+                    {selectedTopup.topup_code}
+                  </code>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('topup.reference')}</span>
-                  <code className="bg-muted px-2 py-0.5 rounded text-sm">{selectedTopup.reference}</code>
-                </div>
+                {selectedTopup.bank_transaction_id && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{lang === 'en' ? 'Bank TX' : 'Mã GD Bank'}</span>
+                    <code className="bg-muted px-2 py-0.5 rounded text-sm">{selectedTopup.bank_transaction_id}</code>
+                  </div>
+                )}
                 {selectedTopup.admin_note && (
                   <div className="pt-2 border-t">
                     <span className="text-muted-foreground text-sm">{lang === 'en' ? 'Admin note' : 'Ghi chú admin'}</span>

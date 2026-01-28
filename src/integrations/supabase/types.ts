@@ -603,6 +603,7 @@ export type Database = {
           admin_id: string | null
           admin_note: string | null
           amount: number
+          bank_transaction_id: string | null
           created_at: string
           decided_at: string | null
           id: string
@@ -611,12 +612,14 @@ export type Database = {
           proof_url: string | null
           reference: string | null
           status: Database["public"]["Enums"]["topup_status"]
+          topup_code: string | null
           user_id: string
         }
         Insert: {
           admin_id?: string | null
           admin_note?: string | null
           amount: number
+          bank_transaction_id?: string | null
           created_at?: string
           decided_at?: string | null
           id?: string
@@ -625,12 +628,14 @@ export type Database = {
           proof_url?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["topup_status"]
+          topup_code?: string | null
           user_id: string
         }
         Update: {
           admin_id?: string | null
           admin_note?: string | null
           amount?: number
+          bank_transaction_id?: string | null
           created_at?: string
           decided_at?: string | null
           id?: string
@@ -639,6 +644,7 @@ export type Database = {
           proof_url?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["topup_status"]
+          topup_code?: string | null
           user_id?: string
         }
         Relationships: []
@@ -732,6 +738,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_topup_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

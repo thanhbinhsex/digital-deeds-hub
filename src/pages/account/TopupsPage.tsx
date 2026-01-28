@@ -16,10 +16,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency, formatDate } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, Building2 } from 'lucide-react';
+import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, Building2, QrCode } from 'lucide-react';
+
+const MIN_TOPUP = 10000;
+const MAX_TOPUP = 100000000;
 
 const topupSchema = z.object({
-  amount: z.number().min(10000, 'Số tiền tối thiểu là 10,000 VND').max(100000000, 'Số tiền tối đa là 100,000,000 VND'),
+  amount: z.number().min(MIN_TOPUP, `Số tiền tối thiểu là ${MIN_TOPUP.toLocaleString('vi-VN')} VND`).max(MAX_TOPUP, `Số tiền tối đa là ${MAX_TOPUP.toLocaleString('vi-VN')} VND`),
   note: z.string().optional(),
 });
 
@@ -28,9 +31,20 @@ type TopupForm = z.infer<typeof topupSchema>;
 // Bank info for auto topup
 const BANK_INFO = {
   bankName: 'Vietcombank',
+  bankCode: 'VCB',
   accountNumber: '1042986008',
   accountName: 'PHAM THANH BINH',
 };
+
+// Preset amount packages
+const AMOUNT_PACKAGES = [
+  { value: 100000, label: '100K' },
+  { value: 200000, label: '200K' },
+  { value: 500000, label: '500K' },
+  { value: 1000000, label: '1 Triệu' },
+  { value: 2000000, label: '2 Triệu' },
+  { value: 5000000, label: '5 Triệu' },
+];
 
 function TopupStatusBadge({ status }: { status: string }) {
   const { t } = useLanguage();
@@ -59,6 +73,17 @@ function TopupStatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
+}
+
+// Generate VietQR URL
+function generateVietQRUrl(amount: number, content: string): string {
+  const bankId = '970436'; // Vietcombank bank ID for VietQR
+  const accountNo = BANK_INFO.accountNumber;
+  const template = 'compact2';
+  const accountName = encodeURIComponent(BANK_INFO.accountName);
+  const addInfo = encodeURIComponent(content);
+  
+  return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${addInfo}&accountName=${accountName}`;
 }
 
 export default function TopupsPage() {
@@ -160,10 +185,13 @@ export function NewTopupPage() {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [createdTopup, setCreatedTopup] = useState<{ topup_code: string; amount: number } | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<TopupForm>({
     resolver: zodResolver(topupSchema),
@@ -173,9 +201,16 @@ export function NewTopupPage() {
     },
   });
 
+  const currentAmount = watch('amount');
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success(lang === 'en' ? 'Copied!' : 'Đã sao chép!');
+  };
+
+  const handlePackageSelect = (amount: number) => {
+    setSelectedPackage(amount);
+    setValue('amount', amount, { shouldValidate: true });
   };
 
   const onSubmit = async (data: TopupForm) => {
@@ -221,7 +256,7 @@ export function NewTopupPage() {
 
   // Show bank transfer instructions after creating topup
   if (createdTopup) {
-    const transferContent = `${createdTopup.topup_code}`;
+    const qrUrl = generateVietQRUrl(createdTopup.amount, createdTopup.topup_code);
     
     return (
       <div className="space-y-6">
@@ -237,12 +272,24 @@ export function NewTopupPage() {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              {t('topup.bankInfo')}
+              <QrCode className="h-5 w-5" />
+              {lang === 'en' ? 'Scan QR to Pay' : 'Quét mã QR để thanh toán'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-success/10 border border-success/30 rounded-lg p-4">
+            {/* QR Code */}
+            <div className="flex justify-center p-4 bg-white rounded-lg">
+              <img 
+                src={qrUrl} 
+                alt="VietQR Payment" 
+                className="w-64 h-64 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+
+            <div className="bg-success/10 border border-success/30 rounded-lg p-4 text-center">
               <p className="text-success font-medium mb-2">
                 {lang === 'en' ? '✓ Request created! Please transfer:' : '✓ Đã tạo yêu cầu! Vui lòng chuyển khoản:'}
               </p>
@@ -277,9 +324,9 @@ export function NewTopupPage() {
               <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg">
                 <div>
                   <p className="text-sm text-muted-foreground">{lang === 'en' ? 'Transfer Content (IMPORTANT!)' : 'Nội dung chuyển khoản (QUAN TRỌNG!)'}</p>
-                  <p className="font-bold font-mono text-lg text-primary">{transferContent}</p>
+                  <p className="font-bold font-mono text-lg text-primary">{createdTopup.topup_code}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(transferContent)}>
+                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(createdTopup.topup_code)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
@@ -317,46 +364,61 @@ export function NewTopupPage() {
       </div>
 
       <Card className="border-border/50">
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <CardHeader>
+          <CardTitle>{lang === 'en' ? 'Select Amount' : 'Chọn số tiền nạp'}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Amount packages */}
+          <div className="grid grid-cols-3 gap-3">
+            {AMOUNT_PACKAGES.map((pkg) => (
+              <Button
+                key={pkg.value}
+                type="button"
+                variant={selectedPackage === pkg.value ? 'default' : 'outline'}
+                className={`h-16 flex flex-col ${selectedPackage === pkg.value ? 'gradient-primary text-primary-foreground shadow-glow' : ''}`}
+                onClick={() => handlePackageSelect(pkg.value)}
+              >
+                <span className="text-lg font-bold">{pkg.label}</span>
+                <span className="text-xs opacity-80">{pkg.value.toLocaleString('vi-VN')}đ</span>
+              </Button>
+            ))}
+          </div>
+
+          {/* Custom amount input */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">{t('topup.amount')} (VND)</Label>
+              <Label htmlFor="amount">{lang === 'en' ? 'Or enter custom amount' : 'Hoặc nhập số tiền khác'} (VND)</Label>
               <Input
                 id="amount"
                 type="number"
                 {...register('amount', { valueAsNumber: true })}
                 placeholder="100000"
+                onChange={(e) => {
+                  setSelectedPackage(null);
+                  register('amount').onChange(e);
+                }}
               />
               <p className="text-sm text-muted-foreground">
                 {lang === 'en'
-                  ? 'Enter amount in VND. Minimum: 10,000 VND'
-                  : 'Nhập số tiền bằng VND. Tối thiểu: 10,000 VND'}
+                  ? `Min: ${MIN_TOPUP.toLocaleString()} VND - Max: ${MAX_TOPUP.toLocaleString()} VND`
+                  : `Tối thiểu: ${MIN_TOPUP.toLocaleString()} VND - Tối đa: ${MAX_TOPUP.toLocaleString()} VND`}
               </p>
               {errors.amount && (
                 <p className="text-sm text-destructive">{errors.amount.message}</p>
               )}
             </div>
 
-            {/* Quick amount buttons */}
-            <div className="grid grid-cols-4 gap-2">
-              {[50000, 100000, 200000, 500000].map((amt) => (
-                <Button
-                  key={amt}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const input = document.getElementById('amount') as HTMLInputElement;
-                    if (input) {
-                      input.value = amt.toString();
-                      input.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                  }}
-                >
-                  {(amt / 1000).toLocaleString()}K
-                </Button>
-              ))}
-            </div>
+            {/* Preview amount */}
+            {currentAmount >= MIN_TOPUP && (
+              <div className="p-4 bg-muted rounded-lg text-center">
+                <p className="text-sm text-muted-foreground mb-1">
+                  {lang === 'en' ? 'You will top up' : 'Bạn sẽ nạp'}
+                </p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(currentAmount, 'VND', lang)}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="note">{t('topup.note')}</Label>
@@ -364,7 +426,7 @@ export function NewTopupPage() {
                 id="note"
                 {...register('note')}
                 placeholder={lang === 'en' ? 'Additional notes (optional)' : 'Ghi chú (tùy chọn)'}
-                rows={3}
+                rows={2}
               />
             </div>
 
@@ -380,10 +442,10 @@ export function NewTopupPage() {
               <Button
                 type="submit"
                 className="flex-1 gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
-                disabled={isLoading}
+                disabled={isLoading || currentAmount < MIN_TOPUP}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {lang === 'en' ? 'Create Request' : 'Tạo yêu cầu'}
+                {lang === 'en' ? 'Continue' : 'Tiếp tục'}
               </Button>
             </div>
           </form>

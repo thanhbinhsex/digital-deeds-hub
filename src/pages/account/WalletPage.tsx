@@ -59,7 +59,7 @@ export default function WalletPage() {
                 <Skeleton className="h-10 w-40 bg-primary-foreground/20" />
               ) : (
                 <p className="text-4xl font-bold text-primary-foreground">
-                  {formatCurrency(wallet?.balance || 0, 'USD', lang)}
+                  {formatCurrency(wallet?.balance || 0, 'VND', lang)}
                 </p>
               )}
             </div>
@@ -135,10 +135,10 @@ export default function WalletPage() {
                       }`}
                     >
                       {tx.type === 'credit' ? '+' : '-'}
-                      {formatCurrency(tx.amount, 'USD', lang)}
+                      {formatCurrency(tx.amount, 'VND', lang)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {lang === 'en' ? 'Balance:' : 'Số dư:'} {formatCurrency(tx.balance_after, 'USD', lang)}
+                      {lang === 'en' ? 'Balance:' : 'Số dư:'} {formatCurrency(tx.balance_after, 'VND', lang)}
                     </p>
                   </div>
                 </div>

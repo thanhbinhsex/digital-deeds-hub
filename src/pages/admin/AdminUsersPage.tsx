@@ -206,7 +206,7 @@ export default function AdminUsersPage() {
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>
                       <span className="font-medium">
-                        {formatCurrency(user.walletBalance, 'USD', lang)}
+                        {formatCurrency(user.walletBalance, 'VND', lang)}
                       </span>
                     </TableCell>
                     <TableCell>{getStatusBadge(user.status)}</TableCell>

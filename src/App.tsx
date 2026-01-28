@@ -30,7 +30,7 @@ import AdminTopupsPage from "./pages/admin/AdminTopupsPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminAuditPage from "./pages/admin/AdminAuditPage";
 import AdminBlogPage from "./pages/admin/AdminBlogPage";
-import AdminCouponsPage from "./pages/admin/AdminCouponsPage";
+
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import NotFound from "./pages/NotFound";
 
@@ -71,7 +71,7 @@ const App = () => (
                   <Route path="users" element={<AdminUsersPage />} />
                   <Route path="audit" element={<AdminAuditPage />} />
                   <Route path="blog" element={<AdminBlogPage />} />
-                  <Route path="coupons" element={<AdminCouponsPage />} />
+                  
                   <Route path="settings" element={<AdminSettingsPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

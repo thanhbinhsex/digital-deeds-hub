@@ -11,13 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Globe, CreditCard, Bell, Settings } from 'lucide-react';
+import { Save, Globe, CreditCard, Bell, Settings, Gift, Plus, Trash2 } from 'lucide-react';
 
 interface SiteSetting {
   id: string;
   key: string;
   value: Record<string, any>;
   description: string | null;
+}
+
+interface TopupPromotion {
+  min_amount: number;
+  bonus_percent: number;
+  enabled: boolean;
 }
 
 export default function AdminSettingsPage() {
@@ -37,11 +43,21 @@ export default function AdminSettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: Record<string, any> }) => {
-      const { error } = await supabase
-        .from('site_settings')
-        .update({ value })
-        .eq('key', key);
-      if (error) throw error;
+      // Check if setting exists
+      const existing = settings?.find(s => s.key === key);
+      if (existing) {
+        const { error } = await supabase
+          .from('site_settings')
+          .update({ value })
+          .eq('key', key);
+        if (error) throw error;
+      } else {
+        // Insert new setting
+        const { error } = await supabase
+          .from('site_settings')
+          .insert({ key, value });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['site-settings'] });
@@ -74,7 +90,7 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             {lang === 'vi' ? 'Chung' : 'General'}
@@ -82,6 +98,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="payment" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             {lang === 'vi' ? 'Thanh Toán' : 'Payment'}
+          </TabsTrigger>
+          <TabsTrigger value="promotion" className="flex items-center gap-2">
+            <Gift className="h-4 w-4" />
+            {lang === 'vi' ? 'Khuyến Mãi' : 'Promotions'}
           </TabsTrigger>
           <TabsTrigger value="notification" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
@@ -104,6 +124,16 @@ export default function AdminSettingsPage() {
           <PaymentSettings 
             data={getSetting('payment')} 
             onSave={(value) => updateMutation.mutate({ key: 'payment', value })}
+            isPending={updateMutation.isPending}
+            lang={lang}
+          />
+        </TabsContent>
+
+        {/* Promotion Settings */}
+        <TabsContent value="promotion">
+          <PromotionSettings 
+            data={getSetting('topup_promotion')} 
+            onSave={(value) => updateMutation.mutate({ key: 'topup_promotion', value })}
             isPending={updateMutation.isPending}
             lang={lang}
           />
@@ -177,10 +207,11 @@ function GeneralSettings({ data, onSave, isPending, lang }: { data: Record<strin
 
 function PaymentSettings({ data, onSave, isPending, lang }: { data: Record<string, any>; onSave: (value: Record<string, any>) => void; isPending: boolean; lang: string }) {
   const [form, setForm] = useState({
-    bank_name: data.bank_name || '',
-    bank_account: data.bank_account || '',
-    bank_owner: data.bank_owner || '',
+    bank_name: data.bank_name || 'Vietcombank',
+    bank_account: data.bank_account || '1042986008',
+    bank_owner: data.bank_owner || 'PHAM THANH BINH',
     min_topup: data.min_topup || 10000,
+    max_topup: data.max_topup || 100000000,
   });
 
   return (
@@ -207,6 +238,10 @@ function PaymentSettings({ data, onSave, isPending, lang }: { data: Record<strin
             <Label>{lang === 'vi' ? 'Nạp Tối Thiểu (VND)' : 'Min Topup (VND)'}</Label>
             <Input type="number" value={form.min_topup} onChange={e => setForm({ ...form, min_topup: Number(e.target.value) })} />
           </div>
+          <div className="space-y-2">
+            <Label>{lang === 'vi' ? 'Nạp Tối Đa (VND)' : 'Max Topup (VND)'}</Label>
+            <Input type="number" value={form.max_topup} onChange={e => setForm({ ...form, max_topup: Number(e.target.value) })} />
+          </div>
         </div>
         <Button onClick={() => onSave(form)} disabled={isPending}>
           <Save className="h-4 w-4 mr-2" />
@@ -217,34 +252,188 @@ function PaymentSettings({ data, onSave, isPending, lang }: { data: Record<strin
   );
 }
 
+function PromotionSettings({ data, onSave, isPending, lang }: { data: Record<string, any>; onSave: (value: Record<string, any>) => void; isPending: boolean; lang: string }) {
+  const defaultPromos: TopupPromotion[] = [
+    { min_amount: 100000, bonus_percent: 5, enabled: true },
+    { min_amount: 500000, bonus_percent: 10, enabled: true },
+    { min_amount: 1000000, bonus_percent: 15, enabled: true },
+    { min_amount: 5000000, bonus_percent: 20, enabled: true },
+  ];
+  
+  const [promotions, setPromotions] = useState<TopupPromotion[]>(
+    data.promotions || defaultPromos
+  );
+
+  const addPromotion = () => {
+    setPromotions([...promotions, { min_amount: 100000, bonus_percent: 5, enabled: true }]);
+  };
+
+  const removePromotion = (index: number) => {
+    setPromotions(promotions.filter((_, i) => i !== index));
+  };
+
+  const updatePromotion = (index: number, field: keyof TopupPromotion, value: any) => {
+    const updated = [...promotions];
+    updated[index] = { ...updated[index], [field]: value };
+    setPromotions(updated);
+  };
+
+  const handleSave = () => {
+    // Sort by min_amount ascending
+    const sorted = [...promotions].sort((a, b) => a.min_amount - b.min_amount);
+    onSave({ promotions: sorted });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Gift className="h-5 w-5 text-primary" />
+          {lang === 'vi' ? 'Khuyến Mãi Nạp Tiền' : 'Topup Promotions'}
+        </CardTitle>
+        <CardDescription>
+          {lang === 'vi' 
+            ? 'Cấu hình % bonus khi người dùng nạp tiền. Mức cao hơn sẽ ghi đè mức thấp hơn.' 
+            : 'Configure bonus % when users top up. Higher tiers override lower tiers.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-3">
+          {promotions.map((promo, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Switch 
+                checked={promo.enabled} 
+                onCheckedChange={(checked) => updatePromotion(index, 'enabled', checked)}
+              />
+              <div className="flex-1 grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {lang === 'vi' ? 'Từ số tiền (VND)' : 'Min Amount (VND)'}
+                  </Label>
+                  <Input 
+                    type="number" 
+                    value={promo.min_amount} 
+                    onChange={e => updatePromotion(index, 'min_amount', Number(e.target.value))}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    {lang === 'vi' ? 'Bonus (%)' : 'Bonus (%)'}
+                  </Label>
+                  <Input 
+                    type="number" 
+                    value={promo.bonus_percent} 
+                    onChange={e => updatePromotion(index, 'bonus_percent', Number(e.target.value))}
+                    className="h-9"
+                    min={0}
+                    max={100}
+                  />
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-destructive hover:text-destructive"
+                onClick={() => removePromotion(index)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <Button variant="outline" onClick={addPromotion} className="w-full">
+          <Plus className="h-4 w-4 mr-2" />
+          {lang === 'vi' ? 'Thêm Mức Khuyến Mãi' : 'Add Promotion Tier'}
+        </Button>
+
+        <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+          <p className="text-sm text-primary">
+            <strong>{lang === 'vi' ? 'Ví dụ:' : 'Example:'}</strong>{' '}
+            {lang === 'vi' 
+              ? 'Nạp 1,000,000 VND với bonus 15% sẽ nhận được 1,150,000 VND vào ví.'
+              : 'Top up 1,000,000 VND with 15% bonus will receive 1,150,000 VND in wallet.'}
+          </p>
+        </div>
+
+        <Button onClick={handleSave} disabled={isPending}>
+          <Save className="h-4 w-4 mr-2" />
+          {isPending ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...') : (lang === 'vi' ? 'Lưu Khuyến Mãi' : 'Save Promotions')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function NotificationSettings({ data, onSave, isPending, lang }: { data: Record<string, any>; onSave: (value: Record<string, any>) => void; isPending: boolean; lang: string }) {
   const [form, setForm] = useState({
-    telegram_bot_token: data.telegram_bot_token || '',
-    telegram_chat_id: data.telegram_chat_id || '',
-    email_notifications: data.email_notifications ?? true,
+    telegram_enabled: data.telegram_enabled ?? true,
+    notify_on_order: data.notify_on_order ?? true,
+    notify_on_topup: data.notify_on_topup ?? true,
   });
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{lang === 'vi' ? 'Cài Đặt Thông Báo' : 'Notification Settings'}</CardTitle>
-        <CardDescription>{lang === 'vi' ? 'Cấu hình thông báo Telegram và Email' : 'Configure Telegram and Email notifications'}</CardDescription>
+        <CardDescription>
+          {lang === 'vi' 
+            ? 'Cấu hình thông báo Telegram (Bot Token và Chat ID đã được cấu hình trong secrets)'
+            : 'Configure Telegram notifications (Bot Token and Chat ID are configured in secrets)'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Telegram Bot Token</Label>
-            <Input type="password" value={form.telegram_bot_token} onChange={e => setForm({ ...form, telegram_bot_token: e.target.value })} placeholder="123456:ABC-DEF..." />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="font-medium">{lang === 'vi' ? 'Bật Thông Báo Telegram' : 'Enable Telegram Notifications'}</p>
+              <p className="text-sm text-muted-foreground">
+                {lang === 'vi' ? 'Gửi thông báo qua Telegram khi có sự kiện' : 'Send notifications via Telegram on events'}
+              </p>
+            </div>
+            <Switch 
+              checked={form.telegram_enabled} 
+              onCheckedChange={checked => setForm({ ...form, telegram_enabled: checked })} 
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Telegram Chat ID</Label>
-            <Input value={form.telegram_chat_id} onChange={e => setForm({ ...form, telegram_chat_id: e.target.value })} placeholder="-100123456789" />
+
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="font-medium">{lang === 'vi' ? 'Thông Báo Đơn Hàng' : 'Order Notifications'}</p>
+              <p className="text-sm text-muted-foreground">
+                {lang === 'vi' ? 'Gửi thông báo khi có đơn hàng mới' : 'Notify when new orders are placed'}
+              </p>
+            </div>
+            <Switch 
+              checked={form.notify_on_order} 
+              onCheckedChange={checked => setForm({ ...form, notify_on_order: checked })} 
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="font-medium">{lang === 'vi' ? 'Thông Báo Nạp Tiền' : 'Topup Notifications'}</p>
+              <p className="text-sm text-muted-foreground">
+                {lang === 'vi' ? 'Gửi thông báo khi nạp tiền thành công' : 'Notify when topups are successful'}
+              </p>
+            </div>
+            <Switch 
+              checked={form.notify_on_topup} 
+              onCheckedChange={checked => setForm({ ...form, notify_on_topup: checked })} 
+            />
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Switch checked={form.email_notifications} onCheckedChange={checked => setForm({ ...form, email_notifications: checked })} />
-          <Label>{lang === 'vi' ? 'Bật thông báo Email' : 'Enable Email Notifications'}</Label>
+
+        <div className="bg-muted rounded-lg p-3">
+          <p className="text-sm text-muted-foreground">
+            <strong>{lang === 'vi' ? 'Lưu ý:' : 'Note:'}</strong>{' '}
+            {lang === 'vi' 
+              ? 'TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID được cấu hình trong Cloud Secrets.'
+              : 'TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are configured in Cloud Secrets.'}
+          </p>
         </div>
+
         <Button onClick={() => onSave(form)} disabled={isPending}>
           <Save className="h-4 w-4 mr-2" />
           {isPending ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...') : (lang === 'vi' ? 'Lưu Cài Đặt' : 'Save Settings')}

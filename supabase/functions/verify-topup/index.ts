@@ -170,6 +170,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Fetch topup promotion settings
+    const { data: promoSettings } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'topup_promotion')
+      .single();
+
+    // Calculate bonus
+    let bonusPercent = 0;
+    let bonusAmount = 0;
+    const promos = promoSettings?.value?.promotions || [];
+    
+    // Find matching promotion (highest threshold that applies)
+    for (const promo of promos) {
+      if (promo.enabled && topup.amount >= promo.min_amount) {
+        bonusPercent = promo.bonus_percent;
+      }
+    }
+    
+    if (bonusPercent > 0) {
+      bonusAmount = Math.floor(topup.amount * bonusPercent / 100);
+    }
+
+    const totalCredit = topup.amount + bonusAmount;
+
     // Get wallet
     const { data: wallet, error: walletError } = await supabase
       .from('wallets')
@@ -186,20 +211,24 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
     const balanceBefore = wallet.balance;
-    const balanceAfter = balanceBefore + topup.amount;
+    const balanceAfter = balanceBefore + totalCredit;
 
     // Create wallet transaction
+    const bonusNote = bonusAmount > 0 
+      ? ` (+${bonusPercent}% bonus: ${bonusAmount.toLocaleString('vi-VN')} VND)`
+      : '';
+    
     const { error: txError } = await supabase
       .from('wallet_transactions')
       .insert({
         user_id: userId,
         type: 'credit',
-        amount: topup.amount,
+        amount: totalCredit,
         balance_before: balanceBefore,
         balance_after: balanceAfter,
         ref_type: 'topup',
         ref_id: topupId,
-        note: `Auto-verified bank transfer. Transaction: ${matchingTx.transactionID}`,
+        note: `Auto-verified bank transfer. Transaction: ${matchingTx.transactionID}${bonusNote}`,
       });
 
     if (txError) {
@@ -216,12 +245,16 @@ Deno.serve(async (req) => {
       throw walletUpdateError;
     }
 
-    // Update topup request
+    // Update topup request with bonus info
+    const adminNote = bonusAmount > 0
+      ? `Auto-verified. Transaction: ${matchingTx.transactionID}, Amount: ${matchingTx.amount.toLocaleString('vi-VN')} VND, Bonus: +${bonusPercent}% (${bonusAmount.toLocaleString('vi-VN')} VND)`
+      : `Auto-verified. Transaction: ${matchingTx.transactionID}, Amount: ${matchingTx.amount.toLocaleString('vi-VN')} VND`;
+
     const { error: topupUpdateError } = await supabase
       .from('topup_requests')
       .update({
         status: 'approved',
-        admin_note: `Auto-verified. Transaction: ${matchingTx.transactionID}, Amount: ${matchingTx.amount.toLocaleString('vi-VN')} VND`,
+        admin_note: adminNote,
         bank_transaction_id: matchingTx.transactionID,
         decided_at: now,
       })
@@ -231,14 +264,63 @@ Deno.serve(async (req) => {
       throw topupUpdateError;
     }
 
-    console.log(`Topup ${topupId} approved. Balance: ${balanceBefore} -> ${balanceAfter}`);
+    console.log(`Topup ${topupId} approved. Balance: ${balanceBefore} -> ${balanceAfter} (bonus: ${bonusAmount})`);
+
+    // Send Telegram notification for successful topup
+    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+    const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
+    
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+      try {
+        // Get user email
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('user_id', userId)
+          .single();
+        
+        const timestamp = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const formattedAmount = topup.amount.toLocaleString('vi-VN');
+        const formattedTotal = totalCredit.toLocaleString('vi-VN');
+        
+        let message = `💰 <b>NẠP TIỀN THÀNH CÔNG</b>\n\n` +
+          `📋 Mã nạp: <code>${topup.topup_code}</code>\n` +
+          `👤 Email: ${profile?.email || 'N/A'}\n` +
+          `💵 Số tiền: ${formattedAmount} VND\n`;
+        
+        if (bonusAmount > 0) {
+          message += `🎁 Thưởng +${bonusPercent}%: ${bonusAmount.toLocaleString('vi-VN')} VND\n`;
+          message += `💰 Tổng cộng: ${formattedTotal} VND\n`;
+        }
+        
+        message += `🕐 Thời gian: ${timestamp}`;
+
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: 'HTML',
+          }),
+        });
+      } catch (e) {
+        console.error('Telegram notification failed:', e);
+      }
+    }
+
+    const successMessage = bonusAmount > 0
+      ? `Nạp tiền thành công! Bạn nhận thêm ${bonusPercent}% bonus (${bonusAmount.toLocaleString('vi-VN')} VND)`
+      : 'Nạp tiền thành công!';
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Nạp tiền thành công!',
+        message: successMessage,
         data: {
           amount: topup.amount,
+          bonus: bonusAmount,
+          totalCredit,
           balanceBefore,
           balanceAfter,
           transactionId: matchingTx.transactionID,

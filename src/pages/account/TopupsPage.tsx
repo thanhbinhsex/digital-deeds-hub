@@ -228,24 +228,6 @@ export function NewTopupPage() {
       return;
     }
 
-    // Send Telegram notification (fire and forget)
-    try {
-      await supabase.functions.invoke('send-telegram', {
-        body: {
-          type: 'topup',
-          data: {
-            id: insertData.id,
-            amount: data.amount,
-            userEmail: user.email,
-            method: 'bank_transfer',
-            topupCode: insertData.topup_code,
-          },
-        },
-      });
-    } catch (e) {
-      console.error('Telegram notification failed:', e);
-    }
-
     setIsLoading(false);
     setCreatedTopup({ id: insertData.id, topup_code: insertData.topup_code, amount: data.amount });
     queryClient.invalidateQueries({ queryKey: ['topups'] });

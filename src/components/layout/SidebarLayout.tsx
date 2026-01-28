@@ -234,18 +234,18 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
           {!sidebarCollapsed && (
             <Link to="/" className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                M
+                V
               </div>
               <div>
-                <span className="font-display font-bold text-lg">MinMinTool</span>
-                <p className="text-xs text-muted-foreground">GROWN UP</p>
+                <span className="font-display font-bold text-lg">VieTool</span>
+                <p className="text-xs text-muted-foreground">vietool.cc</p>
               </div>
             </Link>
           )}
           {sidebarCollapsed && (
             <Link to="/" className="mx-auto">
               <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                M
+                V
               </div>
             </Link>
           )}
@@ -356,9 +356,9 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           <Link to="/" className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold">
-              M
+              V
             </div>
-            <span className="font-display font-bold">MinMinTool</span>
+            <span className="font-display font-bold">VieTool</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setMobileSidebarOpen(false)}>
             <X className="h-5 w-5" />

@@ -18,6 +18,14 @@ interface TelegramPayload {
   };
 }
 
+// Escape special characters for Telegram HTML mode
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 serve(async (req: Request) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -39,21 +47,23 @@ serve(async (req: Request) => {
 
     let message = '';
     const timestamp = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const formattedAmount = data.amount.toLocaleString('vi-VN');
 
     if (type === 'order') {
-      message = `🛒 *ĐƠN HÀNG MỚI*\n\n` +
-        `📋 Mã đơn: \`${data.id.slice(0, 8)}...\`\n` +
-        `👤 Email: ${data.userEmail || 'N/A'}\n` +
-        `💰 Tổng tiền: ${(data.amount).toLocaleString('vi-VN')} VND\n` +
-        `📦 Sản phẩm: ${data.items?.join(', ') || 'N/A'}\n` +
+      const itemsList = data.items?.join(', ') || 'N/A';
+      message = `🛒 <b>ĐƠN HÀNG MỚI</b>\n\n` +
+        `📋 Mã đơn: <code>${escapeHtml(data.id.slice(0, 8))}...</code>\n` +
+        `👤 Email: ${escapeHtml(data.userEmail || 'N/A')}\n` +
+        `💰 Tổng tiền: ${formattedAmount} VND\n` +
+        `📦 Sản phẩm: ${escapeHtml(itemsList)}\n` +
         `🕐 Thời gian: ${timestamp}`;
     } else if (type === 'topup') {
-      message = `💳 *YÊU CẦU NẠP TIỀN*\n\n` +
-        `📋 Mã yêu cầu: \`${data.id.slice(0, 8)}...\`\n` +
-        `👤 Email: ${data.userEmail || 'N/A'}\n` +
-        `💰 Số tiền: ${(data.amount).toLocaleString('vi-VN')} VND\n` +
-        `🔑 Mã nạp: ${data.topupCode || 'N/A'}\n` +
-        `🏦 Phương thức: ${data.method || 'N/A'}\n` +
+      message = `💳 <b>YÊU CẦU NẠP TIỀN</b>\n\n` +
+        `📋 Mã yêu cầu: <code>${escapeHtml(data.id.slice(0, 8))}...</code>\n` +
+        `👤 Email: ${escapeHtml(data.userEmail || 'N/A')}\n` +
+        `💰 Số tiền: ${formattedAmount} VND\n` +
+        `🔑 Mã nạp: <code>${escapeHtml(data.topupCode || 'N/A')}</code>\n` +
+        `🏦 Phương thức: ${escapeHtml(data.method || 'N/A')}\n` +
         `🕐 Thời gian: ${timestamp}`;
     }
 
@@ -67,7 +77,7 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
       }),
     });
 

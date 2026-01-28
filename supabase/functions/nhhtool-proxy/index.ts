@@ -49,7 +49,7 @@ serve(async (req) => {
         throw new Error('Invalid action. Must be one of: userinfo, buytool, activekey, history');
     }
 
-    console.log(`Calling nhhtool API: ${action}`);
+    console.log(`Calling nhhtool API: ${action}, URL: ${url}`);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -58,8 +58,45 @@ serve(async (req) => {
       },
     });
 
-    const data = await response.json();
-    console.log(`nhhtool API response for ${action}:`, JSON.stringify(data));
+    // Get raw text first to handle empty or non-JSON responses
+    const rawText = await response.text();
+    console.log(`nhhtool API raw response for ${action}:`, rawText);
+
+    // Check if response is empty
+    if (!rawText || rawText.trim() === '') {
+      console.error('Empty response from nhhtool API');
+      return new Response(
+        JSON.stringify({ 
+          status: 'error', 
+          message: 'Empty response from API' 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Try to parse JSON
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseError) {
+      console.error('Failed to parse JSON:', parseError, 'Raw:', rawText);
+      return new Response(
+        JSON.stringify({ 
+          status: 'error', 
+          message: 'Invalid JSON response from API',
+          raw: rawText.substring(0, 200)
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log(`nhhtool API parsed response for ${action}:`, JSON.stringify(data));
 
     return new Response(JSON.stringify(data), {
       status: 200,

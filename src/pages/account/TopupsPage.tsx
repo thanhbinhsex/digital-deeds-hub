@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,21 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency, formatDate } from '@/lib/i18n';
 import { toast } from 'sonner';
-import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, Building2, QrCode } from 'lucide-react';
+import { Plus, Loader2, Clock, CheckCircle2, XCircle, ArrowLeft, Copy, RefreshCw } from 'lucide-react';
 
 const MIN_TOPUP = 10000;
 const MAX_TOPUP = 100000000;
 
 const topupSchema = z.object({
   amount: z.number().min(MIN_TOPUP, `Số tiền tối thiểu là ${MIN_TOPUP.toLocaleString('vi-VN')} VND`).max(MAX_TOPUP, `Số tiền tối đa là ${MAX_TOPUP.toLocaleString('vi-VN')} VND`),
-  note: z.string().optional(),
 });
 
 type TopupForm = z.infer<typeof topupSchema>;
@@ -155,7 +153,7 @@ export default function TopupsPage() {
                       {topup.admin_note && (
                         <p className="text-sm mt-2 p-2 rounded bg-muted">
                           <span className="text-muted-foreground">
-                            {lang === 'en' ? 'Admin note:' : 'Ghi chú admin:'}
+                            {lang === 'en' ? 'Note:' : 'Ghi chú:'}
                           </span>{' '}
                           {topup.admin_note}
                         </p>
@@ -184,8 +182,9 @@ export function NewTopupPage() {
   const { t, lang } = useLanguage();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [createdTopup, setCreatedTopup] = useState<{ topup_code: string; amount: number } | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [createdTopup, setCreatedTopup] = useState<{ id: string; topup_code: string; amount: number } | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<number>(AMOUNT_PACKAGES[0].value);
 
   const {
     register,
@@ -196,8 +195,7 @@ export function NewTopupPage() {
   } = useForm<TopupForm>({
     resolver: zodResolver(topupSchema),
     defaultValues: {
-      amount: 100000,
-      note: '',
+      amount: AMOUNT_PACKAGES[0].value,
     },
   });
 
@@ -221,7 +219,6 @@ export function NewTopupPage() {
       user_id: user.id,
       amount: data.amount,
       method: 'bank_transfer',
-      note: data.note || null,
       status: 'pending',
     }).select().single();
 
@@ -250,8 +247,47 @@ export function NewTopupPage() {
     }
 
     setIsLoading(false);
-    setCreatedTopup({ topup_code: insertData.topup_code, amount: data.amount });
+    setCreatedTopup({ id: insertData.id, topup_code: insertData.topup_code, amount: data.amount });
     queryClient.invalidateQueries({ queryKey: ['topups'] });
+  };
+
+  const handleVerifyTransfer = async () => {
+    if (!createdTopup) return;
+    
+    setIsVerifying(true);
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        toast.error('Vui lòng đăng nhập lại');
+        setIsVerifying(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('verify-topup', {
+        body: { topupId: createdTopup.id },
+      });
+
+      if (error) {
+        toast.error(lang === 'en' ? 'Failed to verify transfer' : 'Không thể xác minh giao dịch');
+        setIsVerifying(false);
+        return;
+      }
+
+      if (data.success) {
+        toast.success(data.message || (lang === 'en' ? 'Top-up successful!' : 'Nạp tiền thành công!'));
+        queryClient.invalidateQueries({ queryKey: ['topups'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        navigate('/account/topups');
+      } else {
+        toast.error(data.message || data.error || (lang === 'en' ? 'Transaction not found' : 'Không tìm thấy giao dịch'));
+      }
+    } catch (error) {
+      console.error('Verify error:', error);
+      toast.error(lang === 'en' ? 'An error occurred' : 'Đã xảy ra lỗi');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   // Show bank transfer instructions after creating topup
@@ -259,94 +295,107 @@ export function NewTopupPage() {
     const qrUrl = generateVietQRUrl(createdTopup.amount, createdTopup.topup_code);
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-lg mx-auto">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/account/topups')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h2 className="font-display text-2xl font-bold">
+          <h2 className="font-display text-xl font-bold">
             {lang === 'en' ? 'Transfer Instructions' : 'Hướng dẫn chuyển khoản'}
           </h2>
         </div>
 
         <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5" />
-              {lang === 'en' ? 'Scan QR to Pay' : 'Quét mã QR để thanh toán'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 space-y-4">
             {/* QR Code */}
-            <div className="flex justify-center p-4 bg-white rounded-lg">
+            <div className="flex justify-center p-2 bg-white rounded-lg">
               <img 
                 src={qrUrl} 
                 alt="VietQR Payment" 
-                className="w-64 h-64 object-contain"
+                className="w-48 h-48 object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             </div>
 
-            <div className="bg-success/10 border border-success/30 rounded-lg p-4 text-center">
-              <p className="text-success font-medium mb-2">
-                {lang === 'en' ? '✓ Request created! Please transfer:' : '✓ Đã tạo yêu cầu! Vui lòng chuyển khoản:'}
+            <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
+              <p className="text-success text-sm font-medium mb-1">
+                {lang === 'en' ? '✓ Request created!' : '✓ Đã tạo yêu cầu!'}
               </p>
-              <p className="text-2xl font-bold">{formatCurrency(createdTopup.amount, 'VND', lang)}</p>
+              <p className="text-xl font-bold">{formatCurrency(createdTopup.amount, 'VND', lang)}</p>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-sm">
                 <div>
-                  <p className="text-sm text-muted-foreground">{lang === 'en' ? 'Bank' : 'Ngân hàng'}</p>
+                  <p className="text-xs text-muted-foreground">{lang === 'en' ? 'Bank' : 'Ngân hàng'}</p>
                   <p className="font-medium">{BANK_INFO.bankName}</p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-sm">
                 <div>
-                  <p className="text-sm text-muted-foreground">{lang === 'en' ? 'Account Number' : 'Số tài khoản'}</p>
+                  <p className="text-xs text-muted-foreground">{lang === 'en' ? 'Account Number' : 'Số TK'}</p>
                   <p className="font-medium font-mono">{BANK_INFO.accountNumber}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(BANK_INFO.accountNumber)}>
+                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(BANK_INFO.accountNumber)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg text-sm">
                 <div>
-                  <p className="text-sm text-muted-foreground">{lang === 'en' ? 'Account Name' : 'Tên tài khoản'}</p>
+                  <p className="text-xs text-muted-foreground">{lang === 'en' ? 'Account Name' : 'Tên TK'}</p>
                   <p className="font-medium">{BANK_INFO.accountName}</p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded-lg">
                 <div>
-                  <p className="text-sm text-muted-foreground">{lang === 'en' ? 'Transfer Content (IMPORTANT!)' : 'Nội dung chuyển khoản (QUAN TRỌNG!)'}</p>
-                  <p className="font-bold font-mono text-lg text-primary">{createdTopup.topup_code}</p>
+                  <p className="text-xs text-muted-foreground">{lang === 'en' ? 'Transfer Content' : 'Nội dung CK'}</p>
+                  <p className="font-bold font-mono text-primary">{createdTopup.topup_code}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(createdTopup.topup_code)}>
+                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(createdTopup.topup_code)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
-              <p className="text-warning text-sm">
+            <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+              <p className="text-warning text-xs">
                 <strong>{lang === 'en' ? 'Important:' : 'Lưu ý:'}</strong>{' '}
                 {lang === 'en' 
-                  ? 'Please include the transfer code in the transfer content. Your balance will be updated automatically within 1-5 minutes after the transfer.'
-                  : 'Vui lòng ghi đúng nội dung chuyển khoản. Số dư sẽ được cập nhật tự động trong 1-5 phút sau khi chuyển khoản.'}
+                  ? 'Please include the transfer code exactly as shown.'
+                  : 'Vui lòng ghi đúng nội dung chuyển khoản.'}
               </p>
             </div>
+
+            {/* Confirm Transfer Button */}
+            <Button 
+              className="w-full gradient-primary text-primary-foreground shadow-glow"
+              onClick={handleVerifyTransfer}
+              disabled={isVerifying}
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {lang === 'en' ? 'Checking...' : 'Đang kiểm tra...'}
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {lang === 'en' ? 'I have transferred - Verify now' : 'Đã chuyển khoản - Xác nhận'}
+                </>
+              )}
+            </Button>
 
             <Button 
               className="w-full" 
               variant="outline"
               onClick={() => navigate('/account/topups')}
             >
-              {lang === 'en' ? 'View My Top-ups' : 'Xem lịch sử nạp tiền'}
+              {lang === 'en' ? 'Back to History' : 'Quay lại lịch sử'}
             </Button>
           </CardContent>
         </Card>
@@ -355,31 +404,30 @@ export function NewTopupPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-lg mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/account/topups')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h2 className="font-display text-2xl font-bold">{t('topup.title')}</h2>
+        <h2 className="font-display text-xl font-bold">{t('topup.title')}</h2>
       </div>
 
       <Card className="border-border/50">
-        <CardHeader>
-          <CardTitle>{lang === 'en' ? 'Select Amount' : 'Chọn số tiền nạp'}</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{lang === 'en' ? 'Select Amount' : 'Chọn số tiền'}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {/* Amount packages */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {AMOUNT_PACKAGES.map((pkg) => (
               <Button
                 key={pkg.value}
                 type="button"
                 variant={selectedPackage === pkg.value ? 'default' : 'outline'}
-                className={`h-16 flex flex-col ${selectedPackage === pkg.value ? 'gradient-primary text-primary-foreground shadow-glow' : ''}`}
+                className={`h-12 flex flex-col ${selectedPackage === pkg.value ? 'gradient-primary text-primary-foreground shadow-glow' : ''}`}
                 onClick={() => handlePackageSelect(pkg.value)}
               >
-                <span className="text-lg font-bold">{pkg.label}</span>
-                <span className="text-xs opacity-80">{pkg.value.toLocaleString('vi-VN')}đ</span>
+                <span className="text-sm font-bold">{pkg.label}</span>
               </Button>
             ))}
           </div>
@@ -387,67 +435,42 @@ export function NewTopupPage() {
           {/* Custom amount input */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">{lang === 'en' ? 'Or enter custom amount' : 'Hoặc nhập số tiền khác'} (VND)</Label>
+              <Label htmlFor="amount" className="text-sm">{lang === 'en' ? 'Or enter amount' : 'Hoặc nhập số tiền'} (VND)</Label>
               <Input
                 id="amount"
                 type="number"
                 {...register('amount', { valueAsNumber: true })}
                 placeholder="100000"
                 onChange={(e) => {
-                  setSelectedPackage(null);
+                  setSelectedPackage(0);
                   register('amount').onChange(e);
                 }}
               />
-              <p className="text-sm text-muted-foreground">
-                {lang === 'en'
-                  ? `Min: ${MIN_TOPUP.toLocaleString()} VND - Max: ${MAX_TOPUP.toLocaleString()} VND`
-                  : `Tối thiểu: ${MIN_TOPUP.toLocaleString()} VND - Tối đa: ${MAX_TOPUP.toLocaleString()} VND`}
-              </p>
               {errors.amount && (
-                <p className="text-sm text-destructive">{errors.amount.message}</p>
+                <p className="text-xs text-destructive">{errors.amount.message}</p>
               )}
             </div>
 
             {/* Preview amount */}
             {currentAmount >= MIN_TOPUP && (
-              <div className="p-4 bg-muted rounded-lg text-center">
-                <p className="text-sm text-muted-foreground mb-1">
-                  {lang === 'en' ? 'You will top up' : 'Bạn sẽ nạp'}
+              <div className="p-3 bg-muted rounded-lg text-center">
+                <p className="text-xs text-muted-foreground mb-1">
+                  {lang === 'en' ? 'Amount' : 'Số tiền nạp'}
                 </p>
-                <p className="text-2xl font-bold text-primary">
+                <p className="text-xl font-bold text-primary">
                   {formatCurrency(currentAmount, 'VND', lang)}
                 </p>
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="note">{t('topup.note')}</Label>
-              <Textarea
-                id="note"
-                {...register('note')}
-                placeholder={lang === 'en' ? 'Additional notes (optional)' : 'Ghi chú (tùy chọn)'}
-                rows={2}
-              />
-            </div>
-
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/account/topups')}
-                className="flex-1"
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
-                disabled={isLoading || currentAmount < MIN_TOPUP}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {lang === 'en' ? 'Continue' : 'Tiếp tục'}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              className="w-full gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity"
+              disabled={isLoading || currentAmount < MIN_TOPUP}
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {lang === 'en' ? 'Continue' : 'Tiếp tục'}
+            </Button>
           </form>
         </CardContent>
       </Card>

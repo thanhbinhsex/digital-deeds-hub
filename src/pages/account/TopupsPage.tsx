@@ -200,7 +200,7 @@ export function NewTopupPage() {
         .from('site_settings')
         .select('value')
         .eq('key', 'topup_promotion')
-        .single();
+        .maybeSingle();
       
       const promos = (data?.value as { promotions?: TopupPromotion[] })?.promotions || [];
       return promos.filter(p => p.enabled).sort((a, b) => a.min_amount - b.min_amount);

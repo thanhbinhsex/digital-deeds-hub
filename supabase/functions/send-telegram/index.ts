@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface TelegramPayload {
@@ -14,6 +14,7 @@ interface TelegramPayload {
     items?: string[];
     method?: string;
     reference?: string;
+    topupCode?: string;
   };
 }
 
@@ -43,16 +44,16 @@ serve(async (req: Request) => {
       message = `🛒 *ĐƠN HÀNG MỚI*\n\n` +
         `📋 Mã đơn: \`${data.id.slice(0, 8)}...\`\n` +
         `👤 Email: ${data.userEmail || 'N/A'}\n` +
-        `💰 Tổng tiền: $${(data.amount / 100).toFixed(2)}\n` +
+        `💰 Tổng tiền: ${(data.amount).toLocaleString('vi-VN')} VND\n` +
         `📦 Sản phẩm: ${data.items?.join(', ') || 'N/A'}\n` +
         `🕐 Thời gian: ${timestamp}`;
     } else if (type === 'topup') {
       message = `💳 *YÊU CẦU NẠP TIỀN*\n\n` +
         `📋 Mã yêu cầu: \`${data.id.slice(0, 8)}...\`\n` +
         `👤 Email: ${data.userEmail || 'N/A'}\n` +
-        `💰 Số tiền: $${(data.amount / 100).toFixed(2)}\n` +
+        `💰 Số tiền: ${(data.amount).toLocaleString('vi-VN')} VND\n` +
+        `🔑 Mã nạp: ${data.topupCode || 'N/A'}\n` +
         `🏦 Phương thức: ${data.method || 'N/A'}\n` +
-        `📝 Tham chiếu: ${data.reference || 'N/A'}\n` +
         `🕐 Thời gian: ${timestamp}`;
     }
 

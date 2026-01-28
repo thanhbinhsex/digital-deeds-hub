@@ -206,7 +206,7 @@ export default function CheckoutPage() {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold truncate">{name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {formatCurrency(item.price, 'USD', lang)}
+                          {formatCurrency(item.price, 'VND', lang)}
                         </p>
 
                         {/* Quantity controls */}
@@ -234,7 +234,7 @@ export default function CheckoutPage() {
                       {/* Price & Remove */}
                       <div className="text-right">
                         <p className="font-semibold">
-                          {formatCurrency(item.price * item.quantity, 'USD', lang)}
+                          {formatCurrency(item.price * item.quantity, 'VND', lang)}
                         </p>
                         <Button
                           variant="ghost"
@@ -263,13 +263,13 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">
                     {lang === 'en' ? 'Subtotal' : 'Tạm tính'} ({items.length} {lang === 'en' ? 'items' : 'sản phẩm'})
                   </span>
-                  <span>{formatCurrency(totalAmount, 'USD', lang)}</span>
+                  <span>{formatCurrency(totalAmount, 'VND', lang)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>{t('cart.total')}</span>
                   <span className="gradient-text">
-                    {formatCurrency(totalAmount, 'USD', lang)}
+                    {formatCurrency(totalAmount, 'VND', lang)}
                   </span>
                 </div>
 
@@ -282,7 +282,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold">
-                        {formatCurrency(wallet.balance, 'USD', lang)}
+                        {formatCurrency(wallet.balance, 'VND', lang)}
                       </span>
                       {canPayWithWallet ? (
                         <Badge className="bg-success/20 text-success border-0">

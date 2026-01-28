@@ -1,1 +1,16 @@
 project_id = "fkhygdlyvtchptvzdxis"
+
+[functions.approve-topup]
+verify_jwt = false
+
+[functions.check-bank-topup]
+verify_jwt = false
+
+[functions.increment-view]
+verify_jwt = false
+
+[functions.nhhtool-proxy]
+verify_jwt = false
+
+[functions.send-telegram]
+verify_jwt = false

@@ -151,7 +151,7 @@ export default function DashboardPage() {
                 <Skeleton className="h-10 w-40 bg-primary-foreground/20" />
               ) : (
                 <p className="text-4xl font-bold">
-                  {formatCurrency(stats?.revenue || 0, 'USD', lang)}
+                  {formatCurrency(stats?.revenue || 0, 'VND', lang)}
                 </p>
               )}
             </div>
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-success">
-                        +{formatCurrency(topup.amount, 'USD', lang)}
+                        +{formatCurrency(topup.amount, 'VND', lang)}
                       </p>
                     </div>
                   </div>

@@ -471,6 +471,7 @@ export type Database = {
           metadata: Json | null
           name: string
           name_vi: string | null
+          nhhtool_id: string | null
           original_price: number | null
           price: number
           short_description: string | null
@@ -491,6 +492,7 @@ export type Database = {
           metadata?: Json | null
           name: string
           name_vi?: string | null
+          nhhtool_id?: string | null
           original_price?: number | null
           price?: number
           short_description?: string | null
@@ -511,6 +513,7 @@ export type Database = {
           metadata?: Json | null
           name?: string
           name_vi?: string | null
+          nhhtool_id?: string | null
           original_price?: number | null
           price?: number
           short_description?: string | null

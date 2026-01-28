@@ -13,6 +13,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExchangeRate, convertCurrency } from '@/hooks/useExchangeRate';
+import { useNhhtoolBuyTool } from '@/hooks/useNhhtoolApi';
 import { formatCurrency } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { 
@@ -27,7 +28,8 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -46,6 +48,7 @@ export default function ProductDetailPage() {
   const { addItem } = useCart();
   const { user } = useAuth();
   const { data: exchangeRate } = useExchangeRate();
+  const buyToolMutation = useNhhtoolBuyTool();
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -205,6 +208,7 @@ export default function ProductDetailPage() {
   const vndPrice = convertCurrency(finalPrice, rate);
   const shortId = product.id.split('-')[0].toUpperCase();
   const viewCount = (product as any).view_count || 0;
+  const nhhtoolId = (product as any).nhhtool_id;
 
   const handleAddToCart = () => {
     addItem({
@@ -224,6 +228,37 @@ export default function ProductDetailPage() {
     }
     handleAddToCart();
     navigate('/checkout');
+  };
+
+  const handleBuyViaNhhtool = async () => {
+    if (!user) {
+      toast.error(lang === 'vi' ? 'Vui lòng đăng nhập để mua tool' : 'Please login to buy tool');
+      navigate('/login');
+      return;
+    }
+
+    if (!agreedTerms) {
+      toast.error(lang === 'vi' ? 'Vui lòng đồng ý với điều khoản' : 'Please agree to the terms');
+      return;
+    }
+
+    if (!nhhtoolId) {
+      toast.error(lang === 'vi' ? 'Tool này chưa được liên kết với NHHTool' : 'This tool is not linked to NHHTool');
+      return;
+    }
+
+    try {
+      const result = await buyToolMutation.mutateAsync(nhhtoolId);
+      if (result.status === 'success') {
+        toast.success(result.msg || (lang === 'vi' ? 'Mua tool thành công!' : 'Tool purchased successfully!'));
+        // Navigate to nhhtool page to see the purchased tool
+        navigate('/account/nhhtool');
+      } else {
+        toast.error(result.msg || (lang === 'vi' ? 'Mua tool thất bại' : 'Failed to purchase tool'));
+      }
+    } catch (error) {
+      toast.error(lang === 'vi' ? 'Có lỗi xảy ra khi mua tool' : 'An error occurred while purchasing');
+    }
   };
 
   return (
@@ -379,15 +414,35 @@ export default function ProductDetailPage() {
                   </label>
                 </div>
 
-                {/* Checkout Button */}
-                <Button
-                  size="lg"
-                  onClick={handleBuyNow}
-                  disabled={!agreedTerms}
-                  className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-500 text-white font-bold text-lg shadow-lg"
-                >
-                  {lang === 'vi' ? 'Thanh Toán' : 'Checkout'}
-                </Button>
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  {/* NHHTool Buy Button - Show if product has nhhtool_id */}
+                  {nhhtoolId && (
+                    <Button
+                      size="lg"
+                      onClick={handleBuyViaNhhtool}
+                      disabled={!agreedTerms || buyToolMutation.isPending}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold text-lg shadow-lg"
+                    >
+                      {buyToolMutation.isPending ? (
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      ) : (
+                        <Zap className="h-5 w-5 mr-2" />
+                      )}
+                      {lang === 'vi' ? 'Mua Tool Ngay' : 'Buy Tool Now'}
+                    </Button>
+                  )}
+
+                  {/* Standard Checkout Button */}
+                  <Button
+                    size="lg"
+                    onClick={handleBuyNow}
+                    disabled={!agreedTerms}
+                    className="w-full bg-gradient-to-r from-green-500 to-yellow-400 hover:from-green-600 hover:to-yellow-500 text-white font-bold text-lg shadow-lg"
+                  >
+                    {lang === 'vi' ? 'Thanh Toán' : 'Checkout'}
+                  </Button>
+                </div>
 
                 {/* Demo Link */}
                 <div className="text-center">

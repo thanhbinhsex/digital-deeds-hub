@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { ProductCard } from '@/components/products/ProductCard';
@@ -12,8 +13,11 @@ import { Search, X } from 'lucide-react';
 
 export default function ProductsPage() {
   const { t, lang } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Read category from URL query params
+  const categorySlug = searchParams.get('category');
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -27,6 +31,9 @@ export default function ProductsPage() {
       return data;
     },
   });
+
+  // Find category ID from slug
+  const selectedCategory = categories?.find(c => c.slug === categorySlug)?.id || null;
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', search, selectedCategory],
@@ -53,7 +60,16 @@ export default function ProductsPage() {
       if (error) throw error;
       return data;
     },
+    enabled: !!categories, // Wait for categories to load first
   });
+
+  const handleCategoryChange = (slug: string | null) => {
+    if (slug) {
+      setSearchParams({ category: slug });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   return (
     <SidebarLayout>
@@ -90,22 +106,22 @@ export default function ProductsPage() {
         {categories && categories.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-8">
             <Badge
-              variant={selectedCategory === null ? 'default' : 'outline'}
+              variant={!categorySlug ? 'default' : 'outline'}
               className={`cursor-pointer ${
-                selectedCategory === null ? 'gradient-primary text-primary-foreground border-0' : ''
+                !categorySlug ? 'gradient-primary text-primary-foreground border-0' : ''
               }`}
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => handleCategoryChange(null)}
             >
               {t('common.all')}
             </Badge>
             {categories.map((category) => (
               <Badge
                 key={category.id}
-                variant={selectedCategory === category.id ? 'default' : 'outline'}
+                variant={categorySlug === category.slug ? 'default' : 'outline'}
                 className={`cursor-pointer ${
-                  selectedCategory === category.id ? 'gradient-primary text-primary-foreground border-0' : ''
+                  categorySlug === category.slug ? 'gradient-primary text-primary-foreground border-0' : ''
                 }`}
-                onClick={() => setSelectedCategory(category.id)}
+                onClick={() => handleCategoryChange(category.slug)}
               >
                 {lang === 'vi' && category.name_vi ? category.name_vi : category.name}
               </Badge>

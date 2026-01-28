@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
@@ -41,107 +40,6 @@ export default function CheckoutPage() {
 
   const canPayWithWallet = wallet && wallet.balance >= totalAmount;
 
-  // Create order mutation
-  const createOrderMutation = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error('Not authenticated');
-      if (!canPayWithWallet) throw new Error('Insufficient balance');
-
-      // Create order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          status: 'pending',
-          total_amount: totalAmount,
-          currency: 'USD',
-          payment_method: 'wallet',
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        product_name: item.name,
-        unit_price: item.price,
-        quantity: item.quantity,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Create payment record
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          order_id: order.id,
-          provider: 'wallet',
-          amount: totalAmount,
-          status: 'completed',
-        });
-
-      if (paymentError) throw paymentError;
-
-      // Update order status to paid
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'paid' })
-        .eq('id', order.id);
-
-      if (updateError) throw updateError;
-
-      // Create entitlements for each product
-      const entitlements = items.map((item) => ({
-        user_id: user.id,
-        product_id: item.productId,
-        order_id: order.id,
-      }));
-
-      const { error: entitlementError } = await supabase
-        .from('entitlements')
-        .insert(entitlements);
-
-      if (entitlementError) throw entitlementError;
-
-      // Send Telegram notification (fire and forget)
-      try {
-        await supabase.functions.invoke('send-telegram', {
-          body: {
-            type: 'order',
-            data: {
-              id: order.id,
-              amount: totalAmount,
-              userEmail: user.email,
-              items: items.map((item) => item.name),
-            },
-          },
-        });
-      } catch (e) {
-        console.error('Telegram notification failed:', e);
-      }
-
-      return order;
-    },
-    onSuccess: () => {
-      clearCart();
-      queryClient.invalidateQueries({ queryKey: ['wallet'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(t('checkout.success'));
-      navigate('/account/purchases');
-    },
-    onError: (error) => {
-      console.error('Order error:', error);
-      toast.error(t('common.error'));
-    },
-  });
-
   const handleCheckout = async () => {
     if (!user) {
       toast.error(lang === 'en' ? 'Please login first' : 'Vui lòng đăng nhập');
@@ -155,8 +53,42 @@ export default function CheckoutPage() {
     }
 
     setIsProcessing(true);
-    await createOrderMutation.mutateAsync();
-    setIsProcessing(false);
+
+    try {
+      // Use secure edge function for checkout
+      const { data, error } = await supabase.functions.invoke('checkout', {
+        body: {
+          items: items.map(item => ({
+            productId: item.productId,
+            name: item.name,
+            nameVi: item.nameVi,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Checkout failed');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Checkout failed');
+      }
+
+      // Success
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(t('checkout.success'));
+      navigate('/account/purchases');
+    } catch (error) {
+      console.error('Checkout error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(errorMessage);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (items.length === 0) {
@@ -285,13 +217,13 @@ export default function CheckoutPage() {
                         {formatCurrency(wallet.balance, 'VND', lang)}
                       </span>
                       {canPayWithWallet ? (
-                        <Badge className="bg-success/20 text-success border-0">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/30">
                           {lang === 'en' ? 'Sufficient' : 'Đủ'}
-                        </Badge>
+                        </span>
                       ) : (
-                        <Badge variant="destructive">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/30">
                           {t('checkout.insufficientBalance')}
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     {!canPayWithWallet && (

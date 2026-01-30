@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,17 +14,11 @@ export default function WalletPage() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
 
-  const { data: wallet, isLoading: walletLoading } = useQuery({
+  const { data: walletData, isLoading: walletLoading } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      if (!user) return null;
-      const { data, error } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const response = await api.getWalletBalance();
+      return response.data;
     },
     enabled: !!user,
   });
@@ -32,15 +26,8 @@ export default function WalletPage() {
   const { data: transactions, isLoading: txLoading } = useQuery({
     queryKey: ['wallet-transactions'],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
+      const response = await api.getWalletTransactions({ limit: 20 });
+      return response.data || [];
     },
     enabled: !!user,
   });
@@ -59,7 +46,7 @@ export default function WalletPage() {
                 <Skeleton className="h-10 w-40 bg-primary-foreground/20" />
               ) : (
                 <p className="text-4xl font-bold text-primary-foreground">
-                  {formatCurrency(wallet?.balance || 0, 'VND', lang)}
+                  {formatCurrency(walletData?.balance || 0, 'VND', lang)}
                 </p>
               )}
             </div>
@@ -99,7 +86,7 @@ export default function WalletPage() {
             </div>
           ) : transactions && transactions.length > 0 ? (
             <div className="space-y-4">
-              {transactions.map((tx) => (
+              {transactions.map((tx: any) => (
                 <div
                   key={tx.id}
                   className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"

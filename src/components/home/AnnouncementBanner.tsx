@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Package, Megaphone } from 'lucide-react';
@@ -11,15 +11,13 @@ export function AnnouncementBanner() {
   const { data: settings } = useQuery({
     queryKey: ['site-settings'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('*');
-      return data || [];
+      const response = await api.getSettings();
+      return response.data || {};
     },
   });
 
-  const generalSettings = settings?.find(s => s.key === 'general')?.value as Record<string, any> || {};
-  const bannerSettings = settings?.find(s => s.key === 'banner')?.value as Record<string, any> || {};
+  const generalSettings = settings?.general || {};
+  const bannerSettings = settings?.banner || {};
 
   const siteName = generalSettings.site_name || 'MinMinTool';
   const title = lang === 'vi' 

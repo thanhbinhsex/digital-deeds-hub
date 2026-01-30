@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +22,6 @@ type ProfileForm = z.infer<typeof profileSchema>;
 export default function ProfilePage() {
   const { profile, refreshProfile, user } = useAuth();
   const { t, lang } = useLanguage();
-  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -42,21 +40,22 @@ export default function ProfilePage() {
     if (!user) return;
     setIsLoading(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
+    try {
+      const response = await api.updateProfile({
         full_name: data.fullName,
         phone: data.phone || null,
-      })
-      .eq('user_id', user.id);
+      });
 
-    setIsLoading(false);
-
-    if (error) {
+      if (response.success) {
+        await refreshProfile();
+        toast.success(t('common.success'));
+      } else {
+        toast.error(response.message || t('common.error'));
+      }
+    } catch (error) {
       toast.error(t('common.error'));
-    } else {
-      await refreshProfile();
-      toast.success(t('common.success'));
+    } finally {
+      setIsLoading(false);
     }
   };
 

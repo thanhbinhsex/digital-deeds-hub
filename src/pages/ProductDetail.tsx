@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,105 +51,53 @@ export default function ProductDetailPage() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', slug],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          category:categories(name, name_vi, slug)
-        `)
-        .eq('slug', slug)
-        .eq('status', 'published')
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error('Product not found');
-      return data;
+      const response = await api.getProduct(slug!);
+      if (!response.success || !response.data) {
+        throw new Error('Product not found');
+      }
+      return response.data;
     },
     enabled: !!slug,
   });
 
   // Fetch wallet balance
-  const { data: wallet } = useQuery({
+  const { data: walletData } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      if (!user) return null;
-      const { data, error } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const response = await api.getWalletBalance();
+      return response.data;
     },
     enabled: !!user,
   });
 
-  // Track view count
+  const wallet = walletData ? { balance: walletData.balance } : null;
+
+  // Track view count (simplified for PHP backend)
   useEffect(() => {
     if (product?.id) {
-      const trackView = async () => {
-        try {
-          await supabase.functions.invoke('increment-view', {
-            body: { product_id: product.id },
-          });
-        } catch (err) {
-          console.error('Failed to track view:', err);
-        }
-      };
-      trackView();
+      // For PHP backend, we'd need a separate endpoint to track views
+      // This is a placeholder - implement if needed
     }
   }, [product?.id]);
 
-  // Validate coupon mutation
-  const validateCouponMutation = useMutation({
-    mutationFn: async (code: string) => {
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', code.toUpperCase())
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error(lang === 'vi' ? 'Mã giảm giá không tồn tại' : 'Coupon not found');
-
-      // Check usage limit
-      if (data.usage_limit && data.used_count >= data.usage_limit) {
-        throw new Error(lang === 'vi' ? 'Mã giảm giá đã hết lượt sử dụng' : 'Coupon usage limit reached');
-      }
-
-      // Check validity period
-      if (data.valid_until && new Date(data.valid_until) < new Date()) {
-        throw new Error(lang === 'vi' ? 'Mã giảm giá đã hết hạn' : 'Coupon has expired');
-      }
-
-      // Check minimum order
-      if (product && data.min_order_amount > product.price) {
-        throw new Error(lang === 'vi' 
-          ? `Đơn hàng tối thiểu ${formatCurrency(data.min_order_amount, 'VND', lang)}` 
-          : `Minimum order ${formatCurrency(data.min_order_amount, 'VND', lang)}`
-        );
-      }
-
-      return data as AppliedCoupon;
-    },
-    onSuccess: (coupon) => {
-      setAppliedCoupon(coupon);
-      toast.success(lang === 'vi' ? 'Đã áp dụng mã giảm giá!' : 'Coupon applied!');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) return;
-    validateCouponMutation.mutate(couponCode);
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || !product) return;
+    
+    setIsValidatingCoupon(true);
+    try {
+      // For now, coupon validation would need a dedicated API endpoint
+      // This is simplified for the PHP backend
+      toast.info(lang === 'vi' ? 'Tính năng mã giảm giá đang được phát triển' : 'Coupon feature is under development');
+    } catch (error) {
+      toast.error(lang === 'vi' ? 'Không thể áp dụng mã giảm giá' : 'Failed to apply coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
   };
 
   const removeCoupon = () => {
@@ -198,26 +146,18 @@ export default function ProductDetailPage() {
     setIsPurchasing(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('checkout', {
-        body: {
-          items: [{
-            productId: product.id,
-            name: product.name,
-            nameVi: product.name_vi,
-            price: finalPrice,
-            quantity: 1,
-          }],
-          couponId: appliedCoupon?.id,
-          discountAmount,
-        },
+      const response = await api.checkout({
+        items: [{
+          productId: product.id,
+          price: finalPrice,
+          quantity: 1,
+        }],
+        couponId: appliedCoupon?.id,
+        discountAmount,
       });
 
-      if (error) {
-        throw new Error(error.message || 'Checkout failed');
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Checkout failed');
+      if (!response.success) {
+        throw new Error(response.message || 'Checkout failed');
       }
 
       // Success
@@ -279,7 +219,7 @@ export default function ProductDetailPage() {
     : null;
 
   const shortId = product.id.split('-')[0].toUpperCase();
-  const viewCount = (product as any).view_count || 0;
+  const viewCount = product.view_count || 0;
 
   return (
     <SidebarLayout>
@@ -432,9 +372,9 @@ export default function ProductDetailPage() {
                       <Button 
                         variant="secondary" 
                         onClick={handleApplyCoupon}
-                        disabled={validateCouponMutation.isPending || !couponCode.trim()}
+                        disabled={isValidatingCoupon || !couponCode.trim()}
                       >
-                        {validateCouponMutation.isPending ? (
+                        {isValidatingCoupon ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           lang === 'vi' ? 'Áp dụng' : 'Apply'
@@ -504,7 +444,7 @@ export default function ProductDetailPage() {
               </p>
               
               <div className={`prose prose-sm dark:prose-invert max-w-none ${!showFullDescription && 'line-clamp-6'}`}>
-                {description.split('\n').map((para, i) => (
+                {description.split('\n').map((para: string, i: number) => (
                   para.trim() && <p key={i} className="text-muted-foreground">{para}</p>
                 ))}
               </div>

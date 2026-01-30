@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Input } from '@/components/ui/input';
@@ -22,43 +22,22 @@ export default function ProductsPage() {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (error) throw error;
-      return data;
+      const response = await api.getCategories();
+      return response.data || [];
     },
   });
 
   // Find category ID from slug
-  const selectedCategory = categories?.find(c => c.slug === categorySlug)?.id || null;
+  const selectedCategory = categories?.find((c: any) => c.slug === categorySlug)?.id || null;
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', search, selectedCategory],
     queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          category:categories(name, name_vi)
-        `)
-        .eq('status', 'published')
-        .order('featured', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (selectedCategory) {
-        query = query.eq('category_id', selectedCategory);
-      }
-
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,name_vi.ilike.%${search}%,description.ilike.%${search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const response = await api.getProducts({
+        category_id: selectedCategory || undefined,
+        search: search || undefined,
+      });
+      return response.data || [];
     },
     enabled: !!categories, // Wait for categories to load first
   });
@@ -114,7 +93,7 @@ export default function ProductsPage() {
             >
               {t('common.all')}
             </Badge>
-            {categories.map((category) => (
+            {categories.map((category: any) => (
               <Badge
                 key={category.id}
                 variant={categorySlug === category.slug ? 'default' : 'outline'}
@@ -147,7 +126,7 @@ export default function ProductsPage() {
           </div>
         ) : products && products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
+            {products.map((product: any) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,13 +27,8 @@ export default function BlogPage() {
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ['blog-posts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('id, title, title_vi, slug, excerpt, excerpt_vi, image_url, published_at, created_at')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
-      if (error) throw error;
-      return data as BlogPost[];
+      const response = await api.getBlogPosts();
+      return (response.data || []) as BlogPost[];
     },
   });
 

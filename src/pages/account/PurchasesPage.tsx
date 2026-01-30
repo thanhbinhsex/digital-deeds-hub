@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,20 +17,8 @@ export default function PurchasesPage() {
   const { data: orders, isLoading } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items(
-            *,
-            product:products(name, name_vi, image_url)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
+      const response = await api.getOrders();
+      return response.data || [];
     },
     enabled: !!user,
   });
@@ -38,17 +26,8 @@ export default function PurchasesPage() {
   const { data: entitlements } = useQuery({
     queryKey: ['entitlements'],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('entitlements')
-        .select(`
-          *,
-          product:products(name, name_vi, slug),
-          assets:product_assets(*)
-        `)
-        .eq('user_id', user.id);
-      if (error) throw error;
-      return data;
+      const response = await api.getEntitlements();
+      return response.data || [];
     },
     enabled: !!user,
   });
@@ -70,7 +49,7 @@ export default function PurchasesPage() {
   };
 
   const handleDownload = (productId: string) => {
-    const productEntitlements = entitlements?.filter((e) => e.product_id === productId);
+    const productEntitlements = entitlements?.filter((e: any) => e.product_id === productId);
     if (!productEntitlements || productEntitlements.length === 0) {
       toast.error(lang === 'en' ? 'No entitlement found' : 'Không tìm thấy quyền truy cập');
       return;
@@ -107,7 +86,7 @@ export default function PurchasesPage() {
         </div>
       ) : orders && orders.length > 0 ? (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {orders.map((order: any) => (
             <Card key={order.id} className="border-border/50">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">

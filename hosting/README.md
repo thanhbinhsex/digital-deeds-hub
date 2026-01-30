@@ -1,4 +1,215 @@
-# VieTool Hosting Package
+# VieTool - Hướng dẫn triển khai cPanel
+
+## Mục lục
+1. [Yêu cầu hệ thống](#1-yêu-cầu-hệ-thống)
+2. [Chuẩn bị](#2-chuẩn-bị)
+3. [Triển khai Database MySQL](#3-triển-khai-database-mysql)
+4. [Triển khai API PHP](#4-triển-khai-api-php)
+5. [Triển khai Frontend React](#5-triển-khai-frontend-react)
+6. [Cấu hình CORS và Bảo mật](#6-cấu-hình-cors-và-bảo-mật)
+7. [Kiểm tra và Debug](#7-kiểm-tra-và-debug)
+
+---
+
+## 1. Yêu cầu hệ thống
+
+- PHP >= 8.0
+- MySQL >= 5.7 hoặc MariaDB >= 10.3
+- Apache với mod_rewrite enabled
+- SSL certificate (khuyến nghị)
+
+---
+
+## 2. Chuẩn bị
+
+### 2.1. Build React Frontend
+```bash
+npm run build
+```
+Kết quả sẽ nằm trong thư mục `dist/`
+
+### 2.2. Cấu trúc upload lên hosting
+```
+public_html/
+├── index.html          # Từ dist/
+├── assets/             # Từ dist/assets/
+├── .htaccess           # Từ public/.htaccess (SPA routing)
+└── api/                # Từ hosting/api/
+    ├── .htaccess
+    ├── index.php
+    ├── config.php
+    ├── Database.php
+    ├── JWT.php
+    ├── Response.php
+    └── endpoints/
+        └── *.php
+```
+
+---
+
+## 3. Triển khai Database MySQL
+
+### 3.1. Tạo Database
+1. Đăng nhập **cPanel** → **MySQL® Databases**
+2. Tạo database mới: `vietool_db`
+3. Tạo user mới: `vietool_user` với mật khẩu mạnh
+4. **Add User to Database** với **ALL PRIVILEGES**
+
+### 3.2. Import Schema
+1. Mở **phpMyAdmin** trong cPanel
+2. Chọn database vừa tạo
+3. Tab **Import** → chọn file `hosting/database_mysql.sql`
+4. Click **Go** để import
+
+### 3.3. Tạo tài khoản Admin
+Chạy SQL trong phpMyAdmin:
+```sql
+-- Tạo admin (password: admin123)
+INSERT INTO profiles (id, user_id, email, full_name, password_hash, role, status, created_at, updated_at)
+VALUES (
+  UUID(),
+  UUID(),
+  'admin@yourdomain.com',
+  'Administrator',
+  '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  'admin',
+  'active',
+  NOW(),
+  NOW()
+);
+```
+> **Lưu ý**: Đổi email và password sau khi đăng nhập lần đầu!
+
+---
+
+## 4. Triển khai API PHP
+
+### 4.1. Upload files
+Upload thư mục `hosting/api/` vào `public_html/api/`
+
+### 4.2. Cấu hình config.php
+Mở `api/config.php` và chỉnh sửa:
+
+```php
+<?php
+// Database Configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'tên_database_của_bạn');   // VD: vietool_db
+define('DB_USER', 'user_database_của_bạn'); // VD: vietool_user  
+define('DB_PASS', 'password_database');
+
+// JWT Secret - THAY ĐỔI THÀNH CHUỖI NGẪU NHIÊN DÀI!
+define('JWT_SECRET', 'thay-doi-thanh-chuoi-bi-mat-dai-32-ky-tu-tro-len');
+
+// Allowed Origins - Thêm domain của bạn
+define('ALLOWED_ORIGINS', [
+    'https://yourdomain.com',
+    'https://www.yourdomain.com',
+    'http://localhost:5173',  // Xóa dòng này khi lên production
+]);
+
+// Debug Mode - TẮT khi lên production!
+define('DEBUG_MODE', false);
+```
+
+### 4.3. Kiểm tra quyền file
+```
+api/config.php: 644
+api/*.php: 644
+api/endpoints/*.php: 644
+api/.htaccess: 644
+```
+
+### 4.4. Test API
+Truy cập: `https://yourdomain.com/api/health`
+Kết quả mong đợi: `{"success": true, "data": {"status": "ok"}}`
+
+---
+
+## 5. Triển khai Frontend React
+
+### 5.1. Cấu hình API URL
+Trước khi build, tạo file `.env.production`:
+```env
+VITE_API_URL=https://yourdomain.com/api
+```
+
+Hoặc sửa trực tiếp trong `src/lib/api.ts`:
+```typescript
+const API_BASE_URL = 'https://yourdomain.com/api';
+```
+
+### 5.2. Build lại Frontend
+```bash
+npm run build
+```
+
+### 5.3. Upload Frontend
+1. Upload toàn bộ nội dung thư mục `dist/` vào `public_html/`
+2. Copy `public/.htaccess` vào `public_html/.htaccess` (SPA routing)
+
+### 5.4. Kiểm tra .htaccess cho SPA
+File `.htaccess` trong `public_html/` phải có nội dung redirect về `index.html`:
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api
+    RewriteRule ^ index.html [L]
+</IfModule>
+```
+> **Đây là fix cho lỗi 404 khi refresh trang (F5)**
+
+---
+
+## 6. Cấu hình CORS và Bảo mật
+
+### 6.1. CORS đã được xử lý trong API
+File `api/index.php` tự động xử lý CORS headers.
+
+### 6.2. SSL
+Khuyến nghị bật **Force HTTPS** trong cPanel:
+- cPanel → **SSL/TLS Status** → Enable **Force HTTPS Redirect**
+
+### 6.3. Bảo mật thêm
+- Đổi `JWT_SECRET` thành chuỗi ngẫu nhiên dài
+- Đặt `DEBUG_MODE = false`
+- Xóa `http://localhost:5173` khỏi `ALLOWED_ORIGINS`
+
+---
+
+## 7. Kiểm tra và Debug
+
+### 7.1. Kiểm tra API
+```bash
+# Health check
+curl https://yourdomain.com/api/health
+
+# Test login
+curl -X POST https://yourdomain.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@yourdomain.com","password":"admin123"}'
+```
+
+### 7.2. Lỗi thường gặp
+
+| Lỗi | Nguyên nhân | Cách sửa |
+|-----|-------------|----------|
+| 404 khi refresh | Thiếu .htaccess hoặc mod_rewrite | Upload `.htaccess` cho SPA routing |
+| 500 Internal Error | Lỗi PHP hoặc config | Bật `DEBUG_MODE = true`, xem error log |
+| CORS error | Origin không được phép | Thêm domain vào `ALLOWED_ORIGINS` |
+| Database connection failed | Sai thông tin DB | Kiểm tra DB_HOST, DB_NAME, DB_USER, DB_PASS |
+| Login không được | Sai password hash | Tạo lại user với SQL ở trên |
+
+### 7.3. Xem Error Logs
+cPanel → **Errors** hoặc **Raw Access** để xem Apache error logs.
+
+---
+
+## Liên hệ hỗ trợ
+Nếu gặp vấn đề, vui lòng mở issue trên GitHub hoặc liên hệ developer
 
 Gói triển khai cho cPanel hosting với MySQL database.
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -19,35 +19,25 @@ export function HomeContent() {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order');
-      return data || [];
+      const response = await api.getCategories();
+      return response.data || [];
     },
   });
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', activeCategory],
     queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select('*, category:categories(name, name_vi)')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false });
-
-      if (activeCategory) {
-        query = query.eq('category_id', activeCategory);
-      }
-
-      const { data } = await query.limit(12);
-      return data || [];
+      const response = await api.getProducts({
+        category_id: activeCategory || undefined,
+        limit: 12,
+      });
+      return response.data || [];
     },
   });
 
   const categoryTabs = [
     { id: null, label: lang === 'vi' ? 'TẤT CẢ' : 'ALL' },
-    ...(categories?.map((cat) => ({
+    ...(categories?.map((cat: any) => ({
       id: cat.id,
       label: (lang === 'vi' && cat.name_vi ? cat.name_vi : cat.name).toUpperCase(),
     })) || []),
@@ -92,7 +82,7 @@ export function HomeContent() {
                 </div>
               </div>
             ))
-          : products?.map((product) => (
+          : products?.map((product: any) => (
               <div
                 key={product.id}
                 className="rounded-xl border border-border bg-card overflow-hidden group hover:shadow-lg transition-shadow"

@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { api, User, ApiError } from '@/lib/api';
 
 interface Profile {
   id: string;
-  userId: string;
   email: string;
   fullName: string | null;
+  username: string | null;
   avatarUrl: string | null;
   phone: string | null;
   status: 'active' | 'suspended' | 'banned';
@@ -14,7 +13,6 @@ interface Profile {
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   profile: Profile | null;
   isAdmin: boolean;
   loading: boolean;
@@ -28,103 +26,103 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const updateProfileFromUser = (userData: User) => {
+    setProfile({
+      id: userData.id,
+      email: userData.email,
+      fullName: userData.full_name,
+      username: userData.username,
+      avatarUrl: userData.avatar_url,
+      phone: userData.phone,
+      status: userData.status,
+    });
+    setIsAdmin(userData.role === 'admin');
+  };
+
+  const fetchProfile = async () => {
     try {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (profileData) {
-        setProfile({
-          id: profileData.id,
-          userId: profileData.user_id,
-          email: profileData.email,
-          fullName: profileData.full_name,
-          avatarUrl: profileData.avatar_url,
-          phone: profileData.phone,
-          status: profileData.status as 'active' | 'suspended' | 'banned',
-        });
+      const response = await api.getProfile();
+      if (response.success && response.data) {
+        setUser(response.data);
+        updateProfileFromUser(response.data);
       }
-
-      // Check if admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      setIsAdmin(roleData?.role === 'admin');
     } catch (error) {
       console.error('Error fetching profile:', error);
+      // If unauthorized, clear auth state
+      if (error instanceof ApiError && error.status === 401) {
+        api.clearToken();
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+      }
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-
-        if (currentSession?.user) {
-          // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => fetchProfile(currentSession.user.id), 0);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
-        }
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      if (existingSession) {
-        setSession(existingSession);
-        setUser(existingSession.user);
-        fetchProfile(existingSession.user.id);
+    // Check for existing auth on mount
+    const initAuth = async () => {
+      if (api.isLoggedIn()) {
+        await fetchProfile();
       }
       setLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const response = await api.login(email, password);
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        updateProfileFromUser(response.data.user);
+        return { error: null };
+      }
+      return { error: new Error(response.message || 'Login failed') };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { error: new Error(error.message) };
+      }
+      return { error: error as Error };
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string, username?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, username },
-        emailRedirectTo: window.location.origin,
-      },
-    });
-    return { error };
+    try {
+      const response = await api.register({
+        email,
+        password,
+        full_name: fullName,
+        username,
+      });
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        updateProfileFromUser(response.data.user);
+        return { error: null };
+      }
+      return { error: new Error(response.message || 'Registration failed') };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return { error: new Error(error.message) };
+      }
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await api.logout();
     setUser(null);
-    setSession(null);
     setProfile(null);
     setIsAdmin(false);
   };
 
   const refreshProfile = async () => {
-    if (user) {
-      await fetchProfile(user.id);
+    if (api.isLoggedIn()) {
+      await fetchProfile();
     }
   };
 
@@ -132,7 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        session,
         profile,
         isAdmin,
         loading,

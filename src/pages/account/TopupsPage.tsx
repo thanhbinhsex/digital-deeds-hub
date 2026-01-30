@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,14 +97,8 @@ export default function TopupsPage() {
   const { data: topups, isLoading } = useQuery({
     queryKey: ['topups'],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('topup_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
+      const response = await api.getTopupRequests();
+      return response.data || [];
     },
     enabled: !!user,
   });
@@ -138,7 +132,7 @@ export default function TopupsPage() {
             </div>
           ) : topups && topups.length > 0 ? (
             <div className="divide-y divide-border">
-              {topups.map((topup) => (
+              {topups.map((topup: any) => (
                 <div key={topup.id} className="p-4 hover:bg-muted/50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -192,18 +186,13 @@ export function NewTopupPage() {
   const [createdTopup, setCreatedTopup] = useState<{ id: string; topup_code: string; amount: number } | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<number>(AMOUNT_PACKAGES[0].value);
 
-  // Fetch promotions from site_settings
+  // Fetch promotions from settings
   const { data: promotions } = useQuery({
     queryKey: ['topup-promotions'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('value')
-        .eq('key', 'topup_promotion')
-        .maybeSingle();
-      
-      const promos = (data?.value as { promotions?: TopupPromotion[] })?.promotions || [];
-      return promos.filter(p => p.enabled).sort((a, b) => a.min_amount - b.min_amount);
+      const response = await api.getSetting('topup_promotion');
+      const promos = response.data?.promotions || [];
+      return promos.filter((p: TopupPromotion) => p.enabled).sort((a: TopupPromotion, b: TopupPromotion) => a.min_amount - b.min_amount);
     },
   });
 
@@ -258,22 +247,24 @@ export function NewTopupPage() {
     if (!user) return;
     setIsLoading(true);
 
-    const { data: insertData, error } = await supabase.from('topup_requests').insert({
-      user_id: user.id,
-      amount: data.amount,
-      method: 'bank_transfer',
-      status: 'pending',
-    }).select().single();
+    try {
+      const response = await api.createTopupRequest(data.amount, 'bank_transfer');
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to create topup request');
+      }
 
-    if (error) {
-      setIsLoading(false);
+      setCreatedTopup({ 
+        id: response.data.id, 
+        topup_code: response.data.topup_code, 
+        amount: data.amount 
+      });
+      queryClient.invalidateQueries({ queryKey: ['topups'] });
+    } catch (error) {
       toast.error(t('common.error'));
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
-    setCreatedTopup({ id: insertData.id, topup_code: insertData.topup_code, amount: data.amount });
-    queryClient.invalidateQueries({ queryKey: ['topups'] });
   };
 
   const handleVerifyTransfer = async () => {
@@ -282,30 +273,15 @@ export function NewTopupPage() {
     setIsVerifying(true);
     
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
-        toast.error('Vui lòng đăng nhập lại');
-        setIsVerifying(false);
-        return;
-      }
+      const response = await api.verifyTopup(createdTopup.id);
 
-      const { data, error } = await supabase.functions.invoke('verify-topup', {
-        body: { topupId: createdTopup.id },
-      });
-
-      if (error) {
-        toast.error(lang === 'en' ? 'Failed to verify transfer' : 'Không thể xác minh giao dịch');
-        setIsVerifying(false);
-        return;
-      }
-
-      if (data.success) {
-        toast.success(data.message || (lang === 'en' ? 'Top-up successful!' : 'Nạp tiền thành công!'));
+      if (response.success) {
+        toast.success(response.message || (lang === 'en' ? 'Top-up successful!' : 'Nạp tiền thành công!'));
         queryClient.invalidateQueries({ queryKey: ['topups'] });
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         navigate('/account/topups');
       } else {
-        toast.error(data.message || data.error || (lang === 'en' ? 'Transaction not found' : 'Không tìm thấy giao dịch'));
+        toast.error(response.message || (lang === 'en' ? 'Transaction not found' : 'Không tìm thấy giao dịch'));
       }
     } catch (error) {
       console.error('Verify error:', error);
@@ -448,7 +424,7 @@ export function NewTopupPage() {
               </h3>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {promotions.map((promo, idx) => (
+              {promotions.map((promo: TopupPromotion, idx: number) => (
                 <div key={idx} className="bg-background rounded-lg p-2 text-center">
                   <p className="text-xs text-muted-foreground">
                     {lang === 'vi' ? 'Từ' : 'From'} {formatCurrency(promo.min_amount, 'VND', lang)}

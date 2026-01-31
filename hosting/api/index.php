@@ -107,6 +107,11 @@ try {
             handleBlog($method, $id, $input);
             break;
             
+        case 'upload':
+            require_once __DIR__ . '/endpoints/upload.php';
+            handleUpload($method, $input);
+            break;
+            
         case 'admin':
             require_once __DIR__ . '/endpoints/admin.php';
             handleAdmin($method, $action, $id, $input);

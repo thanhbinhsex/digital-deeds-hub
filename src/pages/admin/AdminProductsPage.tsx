@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { api } from '@/lib/api';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +47,6 @@ const productSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']),
   featured: z.boolean().default(false),
   image_url: z.string().optional(),
-  nhhtool_id: z.string().optional(),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -62,26 +61,18 @@ export default function AdminProductsPage() {
   const { data: products, isLoading } = useQuery({
     queryKey: ['admin-products', search],
     queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select(`*, category:categories(name, name_vi)`)
-        .order('created_at', { ascending: false });
-
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,name_vi.ilike.%${search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const params: any = {};
+      if (search) params.search = search;
+      const response = await api.adminGetProducts(params);
+      return response.data || [];
     },
   });
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data } = await supabase.from('categories').select('*').order('sort_order');
-      return data || [];
+      const response = await api.getCategories();
+      return response.data || [];
     },
   });
 
@@ -104,24 +95,9 @@ export default function AdminProductsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ProductForm) => {
-      const insertData = {
-        name: data.name,
-        name_vi: data.name_vi || null,
-        slug: data.slug,
-        description: data.description || null,
-        description_vi: data.description_vi || null,
-        short_description: data.short_description || null,
-        price: data.price,
-        original_price: data.original_price || null,
-        currency: data.currency,
-        category_id: data.category_id || null,
-        status: data.status as 'draft' | 'published' | 'archived',
-        featured: data.featured,
-        image_url: data.image_url || null,
-        nhhtool_id: data.nhhtool_id || null,
-      };
-      const { error } = await supabase.from('products').insert(insertData);
-      if (error) throw error;
+      const response = await api.adminCreateProduct(data);
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
@@ -137,16 +113,9 @@ export default function AdminProductsPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: ProductForm & { id: string }) => {
       const { id, ...rest } = data;
-      const { error } = await supabase
-        .from('products')
-        .update({
-          ...rest,
-          category_id: rest.category_id || null,
-          original_price: rest.original_price || null,
-          nhhtool_id: rest.nhhtool_id || null,
-        })
-        .eq('id', id);
-      if (error) throw error;
+      const response = await api.adminUpdateProduct(id, rest);
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
@@ -162,8 +131,9 @@ export default function AdminProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) throw error;
+      const response = await api.adminDeleteProduct(id);
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
@@ -190,7 +160,6 @@ export default function AdminProductsPage() {
       status: product.status,
       featured: product.featured || false,
       image_url: product.image_url || '',
-      nhhtool_id: product.nhhtool_id || '',
     });
     setIsDialogOpen(true);
   };
@@ -211,7 +180,6 @@ export default function AdminProductsPage() {
       status: 'draft',
       featured: false,
       image_url: '',
-      nhhtool_id: '',
     });
     setIsDialogOpen(true);
   };
@@ -310,7 +278,7 @@ export default function AdminProductsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {categories?.map((cat) => (
+                      {categories?.map((cat: any) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {lang === 'vi' && cat.name_vi ? cat.name_vi : cat.name}
                         </SelectItem>
@@ -333,15 +301,9 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Image URL</Label>
-                  <Input {...register('image_url')} placeholder="https://..." />
-                </div>
-                <div className="space-y-2">
-                  <Label>NHHTool ID</Label>
-                  <Input {...register('nhhtool_id')} placeholder="ID sản phẩm từ nhhtool.id.vn" />
-                </div>
+              <div className="space-y-2">
+                <Label>Image URL</Label>
+                <Input {...register('image_url')} placeholder="https://..." />
               </div>
 
               <div className="flex items-center gap-2">
@@ -408,7 +370,7 @@ export default function AdminProductsPage() {
                   </TableRow>
                 ))
               ) : products && products.length > 0 ? (
-                products.map((product) => (
+                products.map((product: any) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -466,7 +428,7 @@ export default function AdminProductsPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    {t('products.noResults')}
+                    {lang === 'en' ? 'No products found' : 'Không tìm thấy sản phẩm'}
                   </TableCell>
                 </TableRow>
               )}

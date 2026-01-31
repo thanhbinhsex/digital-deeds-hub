@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,44 +42,19 @@ export default function AdminUsersPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-users', search, statusFilter],
     queryFn: async () => {
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (search) {
-        query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
-      }
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as 'active' | 'suspended' | 'banned');
-      }
-
-      const { data: profilesData, error } = await query;
-      if (error) throw error;
-      
-      // Fetch roles and wallets
-      const userIds = profilesData?.map(p => p.user_id) || [];
-      const [rolesRes, walletsRes] = await Promise.all([
-        supabase.from('user_roles').select('user_id, role').in('user_id', userIds),
-        supabase.from('wallets').select('user_id, balance').in('user_id', userIds),
-      ]);
-      
-      return profilesData?.map(profile => ({
-        ...profile,
-        role: rolesRes.data?.find(r => r.user_id === profile.user_id)?.role || 'user',
-        walletBalance: walletsRes.data?.find(w => w.user_id === profile.user_id)?.balance || 0,
-      }));
+      const params: any = {};
+      if (search) params.search = search;
+      if (statusFilter !== 'all') params.status = statusFilter;
+      const response = await api.getAdminUsers(params);
+      return response.data || [];
     },
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: 'active' | 'suspended' | 'banned' }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status })
-        .eq('user_id', userId);
-      if (error) throw error;
+      const response = await api.updateAdminUser(userId, { status });
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -92,11 +67,9 @@ export default function AdminUsersPage() {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: 'admin' | 'user' }) => {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role })
-        .eq('user_id', userId);
-      if (error) throw error;
+      const response = await api.updateAdminUser(userId, { role });
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
@@ -187,7 +160,7 @@ export default function AdminUsersPage() {
                   </TableRow>
                 ))
               ) : users && users.length > 0 ? (
-                users.map((user) => (
+                users.map((user: any) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -206,7 +179,7 @@ export default function AdminUsersPage() {
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>
                       <span className="font-medium">
-                        {formatCurrency(user.walletBalance, 'VND', lang)}
+                        {formatCurrency(user.wallet_balance || 0, 'VND', lang)}
                       </span>
                     </TableCell>
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
@@ -225,14 +198,14 @@ export default function AdminUsersPage() {
                         <DropdownMenuContent align="end">
                           {user.role === 'admin' ? (
                             <DropdownMenuItem
-                              onClick={() => updateRoleMutation.mutate({ userId: user.user_id, role: 'user' })}
+                              onClick={() => updateRoleMutation.mutate({ userId: user.id, role: 'user' })}
                             >
                               <ShieldOff className="h-4 w-4 mr-2" />
                               {lang === 'en' ? 'Remove Admin' : 'Bỏ quyền Admin'}
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onClick={() => updateRoleMutation.mutate({ userId: user.user_id, role: 'admin' })}
+                              onClick={() => updateRoleMutation.mutate({ userId: user.id, role: 'admin' })}
                             >
                               <Shield className="h-4 w-4 mr-2" />
                               {lang === 'en' ? 'Make Admin' : 'Đặt làm Admin'}
@@ -240,7 +213,7 @@ export default function AdminUsersPage() {
                           )}
                           {user.status === 'active' ? (
                             <DropdownMenuItem
-                              onClick={() => updateStatusMutation.mutate({ userId: user.user_id, status: 'suspended' })}
+                              onClick={() => updateStatusMutation.mutate({ userId: user.id, status: 'suspended' })}
                               className="text-warning"
                             >
                               <Ban className="h-4 w-4 mr-2" />
@@ -248,7 +221,7 @@ export default function AdminUsersPage() {
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onClick={() => updateStatusMutation.mutate({ userId: user.user_id, status: 'active' })}
+                              onClick={() => updateStatusMutation.mutate({ userId: user.id, status: 'active' })}
                               className="text-success"
                             >
                               <CheckCircle className="h-4 w-4 mr-2" />
@@ -257,7 +230,7 @@ export default function AdminUsersPage() {
                           )}
                           {user.status !== 'banned' && (
                             <DropdownMenuItem
-                              onClick={() => updateStatusMutation.mutate({ userId: user.user_id, status: 'banned' })}
+                              onClick={() => updateStatusMutation.mutate({ userId: user.id, status: 'banned' })}
                               className="text-destructive"
                             >
                               <Ban className="h-4 w-4 mr-2" />

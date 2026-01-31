@@ -4,7 +4,11 @@
  */
 
 // API Configuration - Change this to your cPanel domain
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://your-domain.com/api';
+// For development/Lovable preview, set VITE_API_URL in .env or leave empty to use placeholder
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+// Check if API is configured
+export const isApiConfigured = () => !!API_BASE_URL;
 
 // Token storage
 const TOKEN_KEY = 'vietool_token';
@@ -370,6 +374,151 @@ class ApiClient {
     limit?: number;
   }): Promise<ApiResponse<any[]>> {
     return this.get('admin/audit', params as Record<string, any>);
+  }
+
+  // ==================== ADMIN PRODUCTS ====================
+
+  async adminGetProducts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    category_id?: string;
+  }): Promise<ApiResponse<any[]>> {
+    return this.get('admin/products', params as Record<string, any>);
+  }
+
+  async adminCreateProduct(data: any): Promise<ApiResponse<any>> {
+    return this.post('admin/products', data);
+  }
+
+  async adminUpdateProduct(productId: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`admin/products/${productId}`, data);
+  }
+
+  async adminDeleteProduct(productId: string): Promise<ApiResponse<any>> {
+    return this.delete(`admin/products/${productId}`);
+  }
+
+  // ==================== ADMIN CATEGORIES ====================
+
+  async adminGetCategories(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<any[]>> {
+    return this.get('admin/categories', params as Record<string, any>);
+  }
+
+  async adminCreateCategory(data: any): Promise<ApiResponse<any>> {
+    return this.post('admin/categories', data);
+  }
+
+  async adminUpdateCategory(categoryId: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`admin/categories/${categoryId}`, data);
+  }
+
+  async adminDeleteCategory(categoryId: string): Promise<ApiResponse<any>> {
+    return this.delete(`admin/categories/${categoryId}`);
+  }
+
+  // ==================== ADMIN ORDERS ====================
+
+  async adminGetOrders(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }): Promise<ApiResponse<any[]>> {
+    return this.get('admin/orders', params as Record<string, any>);
+  }
+
+  async adminUpdateOrderStatus(orderId: string, status: string): Promise<ApiResponse<any>> {
+    return this.put(`admin/orders/${orderId}`, { status });
+  }
+
+  // ==================== ADMIN TOPUPS ====================
+
+  async adminGetTopups(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }): Promise<ApiResponse<any[]>> {
+    return this.get('admin/topups', params as Record<string, any>);
+  }
+
+  async adminCheckBank(): Promise<ApiResponse<any>> {
+    return this.post('admin/check-bank');
+  }
+
+  // ==================== ADMIN BLOG ====================
+
+  async adminGetBlogPosts(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ApiResponse<any[]>> {
+    return this.get('admin/blog', params as Record<string, any>);
+  }
+
+  async adminCreateBlogPost(data: any): Promise<ApiResponse<any>> {
+    return this.post('admin/blog', data);
+  }
+
+  async adminUpdateBlogPost(postId: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`admin/blog/${postId}`, data);
+  }
+
+  async adminDeleteBlogPost(postId: string): Promise<ApiResponse<any>> {
+    return this.delete(`admin/blog/${postId}`);
+  }
+
+  // ==================== ADMIN SETTINGS ====================
+
+  async adminGetAllSettings(): Promise<ApiResponse<Record<string, any>>> {
+    return this.get('admin/settings');
+  }
+
+  async adminUpdateSetting(key: string, value: any): Promise<ApiResponse<any>> {
+    return this.put(`admin/settings/${key}`, { value });
+  }
+
+  // ==================== FILE UPLOAD ====================
+
+  async uploadFile(file: File, type: 'products' | 'blog' | 'general' = 'general'): Promise<ApiResponse<{ url: string; filename: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    const url = `${this.baseUrl}/upload`.replace(/\/+/g, '/').replace(':/', '://');
+    
+    const headers: Record<string, string> = {};
+    const token = this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new ApiError(data.message || 'Upload failed', response.status, data);
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Network error', 0, null);
+    }
   }
 }
 

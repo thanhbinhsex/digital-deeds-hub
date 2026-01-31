@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,51 +46,21 @@ export default function AdminTopupsPage() {
   const { data: topups, isLoading } = useQuery({
     queryKey: ['admin-topups', statusFilter, search],
     queryFn: async () => {
-      let query = supabase
-        .from('topup_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as 'pending' | 'approved' | 'denied');
-      }
-
-      if (search) {
-        query = query.or(`topup_code.ilike.%${search}%,reference.ilike.%${search}%`);
-      }
-
-      const { data: topupsData, error } = await query;
-      if (error) throw error;
-      
-      // Fetch profiles separately
-      const userIds = [...new Set(topupsData?.map(t => t.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email')
-        .in('user_id', userIds);
-      
-      return topupsData?.map(topup => ({
-        ...topup,
-        profile: profiles?.find(p => p.user_id === topup.user_id)
-      }));
+      const params: any = {};
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (search) params.search = search;
+      const response = await api.adminGetTopups(params);
+      return response.data || [];
     },
   });
 
   const processMutation = useMutation({
     mutationFn: async ({ topupId, action, note }: { topupId: string; action: 'approve' | 'deny'; note: string }) => {
-      const response = await supabase.functions.invoke('approve-topup', {
-        body: { topupId, action, adminNote: note },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      if (response.data?.error) {
-        throw new Error(response.data.error);
-      }
-
-      return response.data;
+      const response = action === 'approve' 
+        ? await api.approveTopup(topupId, note)
+        : await api.denyTopup(topupId, note);
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-topups'] });
@@ -112,14 +82,10 @@ export default function AdminTopupsPage() {
   const handleCheckBank = async () => {
     setIsCheckingBank(true);
     try {
-      const response = await supabase.functions.invoke('check-bank-topup');
+      const response = await api.adminCheckBank();
       
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      if (response.data?.success) {
-        const approvedCount = response.data.results?.filter((r: any) => r.matched)?.length || 0;
+      if (response.success) {
+        const approvedCount = response.data?.approved_count || 0;
         if (approvedCount > 0) {
           toast.success(
             lang === 'en' 
@@ -135,7 +101,7 @@ export default function AdminTopupsPage() {
           );
         }
       } else {
-        throw new Error(response.data?.error || 'Unknown error');
+        throw new Error(response.message || 'Unknown error');
       }
     } catch (error: any) {
       toast.error(error.message || t('common.error'));
@@ -256,7 +222,7 @@ export default function AdminTopupsPage() {
                   </TableRow>
                 ))
               ) : topups && topups.length > 0 ? (
-                topups.map((topup) => (
+                topups.map((topup: any) => (
                   <TableRow key={topup.id}>
                     <TableCell>
                       <div className="min-w-0">
@@ -440,9 +406,9 @@ export default function AdminTopupsPage() {
                   </div>
                 )}
                 {selectedTopup.admin_note && (
-                  <div className="pt-2 border-t">
-                    <span className="text-muted-foreground text-sm">{lang === 'en' ? 'Admin note' : 'Ghi chú admin'}</span>
-                    <p className="mt-1">{selectedTopup.admin_note}</p>
+                  <div>
+                    <span className="text-muted-foreground">{lang === 'en' ? 'Admin note' : 'Ghi chú admin'}</span>
+                    <p className="mt-1 text-sm">{selectedTopup.admin_note}</p>
                   </div>
                 )}
               </div>

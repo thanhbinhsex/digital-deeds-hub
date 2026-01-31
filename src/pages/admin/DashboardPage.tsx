@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,10 +9,8 @@ import {
   ShoppingCart,
   Users,
   CreditCard,
-  TrendingUp,
   DollarSign,
   Clock,
-  CheckCircle2,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -21,74 +19,24 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const [products, orders, users, pendingTopups, totalRevenue] = await Promise.all([
-        supabase.from('products').select('id', { count: 'exact', head: true }),
-        supabase.from('orders').select('id', { count: 'exact', head: true }),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('topup_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('orders').select('total_amount').eq('status', 'paid'),
-      ]);
-
-      const revenue = totalRevenue.data?.reduce((sum, o) => sum + o.total_amount, 0) || 0;
-
-      return {
-        products: products.count || 0,
-        orders: orders.count || 0,
-        users: users.count || 0,
-        pendingTopups: pendingTopups.count || 0,
-        revenue,
-      };
+      const response = await api.getAdminDashboard();
+      return response.data;
     },
   });
 
   const { data: recentOrders } = useQuery({
     queryKey: ['recent-orders'],
     queryFn: async () => {
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (!ordersData) return [];
-      
-      // Fetch profiles separately
-      const userIds = [...new Set(ordersData.map(o => o.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email')
-        .in('user_id', userIds);
-      
-      return ordersData.map(order => ({
-        ...order,
-        profile: profiles?.find(p => p.user_id === order.user_id)
-      }));
+      const response = await api.adminGetOrders({ limit: 5 });
+      return response.data || [];
     },
   });
 
   const { data: recentTopups } = useQuery({
     queryKey: ['recent-topups'],
     queryFn: async () => {
-      const { data: topupsData } = await supabase
-        .from('topup_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (!topupsData) return [];
-      
-      // Fetch profiles separately
-      const userIds = [...new Set(topupsData.map(t => t.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email')
-        .in('user_id', userIds);
-      
-      return topupsData.map(topup => ({
-        ...topup,
-        profile: profiles?.find(p => p.user_id === topup.user_id)
-      }));
+      const response = await api.adminGetTopups({ status: 'pending', limit: 5 });
+      return response.data || [];
     },
   });
 
@@ -240,7 +188,7 @@ export default function DashboardPage() {
                         {topup.profile?.full_name || topup.profile?.email || 'User'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {topup.method} • {topup.reference}
+                        {topup.method} • {topup.topup_code}
                       </p>
                     </div>
                     <div className="text-right">

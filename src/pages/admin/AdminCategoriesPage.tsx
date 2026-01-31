@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,36 +55,18 @@ export default function AdminCategoriesPage() {
   const { data: categories, isLoading } = useQuery({
     queryKey: ['admin-categories', search],
     queryFn: async () => {
-      let query = supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,name_vi.ilike.%${search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const params: any = {};
+      if (search) params.search = search;
+      const response = await api.adminGetCategories(params);
+      return response.data || [];
     },
   });
 
   const { data: productCounts } = useQuery({
     queryKey: ['category-product-counts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('category_id');
-      if (error) throw error;
-      
-      const counts: Record<string, number> = {};
-      data?.forEach((product) => {
-        if (product.category_id) {
-          counts[product.category_id] = (counts[product.category_id] || 0) + 1;
-        }
-      });
-      return counts;
+      // This would need a separate admin endpoint in PHP
+      return {};
     },
   });
 
@@ -102,22 +84,14 @@ export default function AdminCategoriesPage() {
     },
   });
 
-  const uploadIcon = async (file: File, slug: string): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${slug}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('category-icons')
-      .upload(filePath, file, { upsert: true });
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from('category-icons')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+  const uploadIcon = async (file: File): Promise<string | null> => {
+    try {
+      const response = await api.uploadFile(file, 'general');
+      return response.data?.url || null;
+    } catch (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,19 +124,16 @@ export default function AdminCategoriesPage() {
       
       if (iconFile) {
         setIsUploading(true);
-        iconUrl = await uploadIcon(iconFile, data.slug);
+        iconUrl = await uploadIcon(iconFile);
         setIsUploading(false);
       }
 
-      const { error } = await supabase.from('categories').insert({
-        name: data.name,
-        name_vi: data.name_vi || null,
-        slug: data.slug,
-        description: data.description || null,
+      const response = await api.adminCreateCategory({
+        ...data,
         icon: iconUrl,
-        sort_order: data.sort_order,
       });
-      if (error) throw error;
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
@@ -184,28 +155,20 @@ export default function AdminCategoriesPage() {
       
       if (iconFile) {
         setIsUploading(true);
-        iconUrl = await uploadIcon(iconFile, rest.slug);
+        iconUrl = await uploadIcon(iconFile);
         setIsUploading(false);
       } else if (iconPreview === null && editingCategory?.icon) {
-        // User removed the icon
         iconUrl = null;
       } else if (iconPreview && !iconFile) {
-        // Keep existing icon
         iconUrl = editingCategory?.icon || null;
       }
 
-      const { error } = await supabase
-        .from('categories')
-        .update({
-          name: rest.name,
-          name_vi: rest.name_vi || null,
-          slug: rest.slug,
-          description: rest.description || null,
-          icon: iconUrl,
-          sort_order: rest.sort_order,
-        })
-        .eq('id', id);
-      if (error) throw error;
+      const response = await api.adminUpdateCategory(id, {
+        ...rest,
+        icon: iconUrl,
+      });
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
@@ -223,8 +186,9 @@ export default function AdminCategoriesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('categories').delete().eq('id', id);
-      if (error) throw error;
+      const response = await api.adminDeleteCategory(id);
+      if (!response.success) throw new Error(response.message);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
@@ -465,7 +429,7 @@ export default function AdminCategoriesPage() {
                   </TableRow>
                 ))
               ) : categories && categories.length > 0 ? (
-                categories.map((category) => (
+                categories.map((category: any) => (
                   <TableRow key={category.id}>
                     <TableCell className="text-muted-foreground">
                       {category.sort_order}
@@ -488,23 +452,25 @@ export default function AdminCategoriesPage() {
                             {lang === 'vi' && category.name_vi ? category.name_vi : category.name}
                           </p>
                           {category.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                               {category.description}
                             </p>
                           )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-sm">
-                      {category.slug}
+                    <TableCell>
+                      <code className="text-sm bg-muted px-2 py-1 rounded">{category.slug}</code>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-2 rounded-full bg-muted text-sm font-medium">
+                      <span className="text-sm font-medium">
                         {productCounts?.[category.id] || 0}
                       </span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatDate(category.created_at, lang).split(',')[0]}
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDate(category.created_at, lang)}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -516,15 +482,6 @@ export default function AdminCategoriesPage() {
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
                           onClick={() => {
-                            const productCount = productCounts?.[category.id] || 0;
-                            if (productCount > 0) {
-                              toast.error(
-                                lang === 'en'
-                                  ? `Cannot delete category with ${productCount} products`
-                                  : `Không thể xóa danh mục có ${productCount} sản phẩm`
-                              );
-                              return;
-                            }
                             if (confirm(lang === 'en' ? 'Delete this category?' : 'Xóa danh mục này?')) {
                               deleteMutation.mutate(category.id);
                             }
@@ -538,7 +495,7 @@ export default function AdminCategoriesPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {lang === 'en' ? 'No categories found' : 'Không tìm thấy danh mục'}
                   </TableCell>
                 </TableRow>

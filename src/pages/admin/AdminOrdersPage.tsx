@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -40,32 +40,11 @@ export default function AdminOrdersPage() {
   const { data: orders, isLoading } = useQuery({
     queryKey: ['admin-orders', search, statusFilter],
     queryFn: async () => {
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          items:order_items(*, product:products(name, name_vi, image_url))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all' && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as 'pending' | 'paid' | 'completed' | 'cancelled' | 'refunded');
-      }
-
-      const { data: ordersData, error } = await query;
-      if (error) throw error;
-      
-      // Fetch profiles separately
-      const userIds = [...new Set(ordersData?.map(o => o.user_id) || [])];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email')
-        .in('user_id', userIds);
-      
-      return ordersData?.map(order => ({
-        ...order,
-        profile: profiles?.find(p => p.user_id === order.user_id)
-      }));
+      const params: any = {};
+      if (search) params.search = search;
+      if (statusFilter !== 'all') params.status = statusFilter;
+      const response = await api.adminGetOrders(params);
+      return response.data || [];
     },
   });
 
@@ -139,7 +118,7 @@ export default function AdminOrdersPage() {
                   </TableRow>
                 ))
               ) : orders && orders.length > 0 ? (
-                orders.map((order) => (
+                orders.map((order: any) => (
                   <TableRow key={order.id}>
                     <TableCell>
                       <code className="text-sm bg-muted px-2 py-1 rounded">

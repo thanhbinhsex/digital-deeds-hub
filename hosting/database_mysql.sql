@@ -316,45 +316,13 @@ CREATE TABLE `user_sessions` (
 -- =====================================================
 -- STORED PROCEDURES
 -- =====================================================
+-- NOTE: Run these statements SEPARATELY in phpMyAdmin SQL tab
+-- or use the "Run SQL file statement by statement" option
 
-DELIMITER //
-
--- Generate topup code
-CREATE FUNCTION generate_topup_code() 
-RETURNS VARCHAR(20)
-DETERMINISTIC
-BEGIN
-  DECLARE chars VARCHAR(36) DEFAULT 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  DECLARE result VARCHAR(20) DEFAULT 'NAP';
-  DECLARE i INT DEFAULT 1;
-  
-  WHILE i <= 6 DO
-    SET result = CONCAT(result, SUBSTRING(chars, FLOOR(1 + RAND() * 36), 1));
-    SET i = i + 1;
-  END WHILE;
-  
-  RETURN result;
-END//
-
--- Trigger to auto-generate topup code
-CREATE TRIGGER tr_set_topup_code
-BEFORE INSERT ON topup_requests
-FOR EACH ROW
-BEGIN
-  IF NEW.topup_code IS NULL THEN
-    SET NEW.topup_code = generate_topup_code();
-  END IF;
-END//
-
--- Trigger to create wallet on user registration
-CREATE TRIGGER tr_create_wallet_on_user
-AFTER INSERT ON users
-FOR EACH ROW
-BEGIN
-  INSERT INTO wallets (user_id, balance) VALUES (NEW.id, 0);
-END//
-
-DELIMITER ;
+-- First, drop existing function if exists
+DROP FUNCTION IF EXISTS generate_topup_code;
+DROP TRIGGER IF EXISTS tr_set_topup_code;
+DROP TRIGGER IF EXISTS tr_create_wallet_on_user;
 
 -- =====================================================
 -- DEFAULT DATA

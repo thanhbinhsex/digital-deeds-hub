@@ -59,7 +59,7 @@ try {
     switch ($endpoint) {
         case 'auth':
             require_once __DIR__ . '/endpoints/auth.php';
-            handleAuth($method, $action, $input);
+            handleAuth($method, $id, $input);
             break;
             
         case 'products':

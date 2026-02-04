@@ -16,7 +16,35 @@ function handleAdmin(string $method, ?string $action, ?string $id, array $input)
             break;
             
         case 'topups':
-            handleAdminTopups($method, $id, $input);
+            handleAdminTopupsRoute($method, $id, $input);
+            break;
+
+        case 'products':
+            require_once __DIR__ . '/products.php';
+            handleProducts($method, $id, null, $input);
+            break;
+
+        case 'categories':
+            require_once __DIR__ . '/categories.php';
+            handleCategories($method, $id, $input);
+            break;
+
+        case 'orders':
+            handleAdminOrders($method, $id, $input);
+            break;
+
+        case 'blog': {
+            require_once __DIR__ . '/blog.php';
+            $inputAll = $input;
+            // Admin view should include all statuses
+            $inputAll['all'] = $inputAll['all'] ?? true;
+            handleBlog($method, $id, $inputAll);
+            break;
+        }
+
+        case 'settings':
+            require_once __DIR__ . '/settings.php';
+            handleSettings($method, $id, $input);
             break;
             
         case 'dashboard':
@@ -32,6 +60,101 @@ function handleAdmin(string $method, ?string $action, ?string $id, array $input)
         default:
             Response::notFound('Action not found');
     }
+}
+
+function handleAdminOrders(string $method, ?string $id, array $input): void {
+    if ($method === 'GET') {
+        require_once __DIR__ . '/orders.php';
+        $inputAll = $input;
+        // Admin should see all orders by default
+        $inputAll['all'] = $inputAll['all'] ?? true;
+        handleOrders($method, $id, $inputAll);
+        return;
+    }
+
+    if ($method === 'PUT') {
+        if (!$id) {
+            Response::error('Order ID required', 400);
+        }
+
+        $status = $input['status'] ?? null;
+        $allowed = ['pending', 'paid', 'completed', 'cancelled', 'refunded'];
+        if (!$status || !in_array($status, $allowed, true)) {
+            Response::validationError(['status' => 'Invalid status']);
+        }
+
+        $db = Database::getInstance();
+        $existing = $db->fetch("SELECT id FROM orders WHERE id = ?", [$id]);
+        if (!$existing) {
+            Response::notFound('Order not found');
+        }
+
+        $db->update('orders', ['status' => $status], 'id = ?', [$id]);
+        $order = $db->fetch("SELECT * FROM orders WHERE id = ?", [$id]);
+        Response::success($order, 'Order updated');
+        return;
+    }
+
+    Response::error('Method not allowed', 405);
+}
+
+function handleAdminTopupsRoute(string $method, ?string $id, array $input): void {
+    if ($method === 'GET') {
+        $db = Database::getInstance();
+
+        if ($id) {
+            $request = $db->fetch(
+                "SELECT t.*, u.email as user_email, u.full_name as user_name\n                 FROM topup_requests t\n                 LEFT JOIN users u ON t.user_id = u.id\n                 WHERE t.id = ?",
+                [$id]
+            );
+
+            if (!$request) {
+                Response::notFound('Topup request not found');
+            }
+
+            Response::success($request);
+            return;
+        }
+
+        $page = max(1, (int)($input['page'] ?? 1));
+        $perPage = min(100, max(1, (int)($input['limit'] ?? 20)));
+        $offset = ($page - 1) * $perPage;
+
+        $where = '1=1';
+        $params = [];
+
+        if (!empty($input['status']) && in_array($input['status'], ['pending', 'approved', 'denied'], true)) {
+            $where .= ' AND t.status = ?';
+            $params[] = $input['status'];
+        }
+
+        // Optional search by user email / code
+        if (!empty($input['search'])) {
+            $search = '%' . $input['search'] . '%';
+            $where .= ' AND (u.email LIKE ? OR u.full_name LIKE ? OR t.topup_code LIKE ?)';
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
+        }
+
+        $total = $db->fetch(
+            "SELECT COUNT(*) as total\n             FROM topup_requests t\n             LEFT JOIN users u ON t.user_id = u.id\n             WHERE $where",
+            $params
+        )['total'];
+
+        $sql = "SELECT t.*, u.email as user_email, u.full_name as user_name\n                FROM topup_requests t\n                LEFT JOIN users u ON t.user_id = u.id\n                WHERE $where\n                ORDER BY t.created_at DESC\n                LIMIT $perPage OFFSET $offset";
+
+        $requests = $db->fetchAll($sql, $params);
+        Response::paginated($requests, $total, $page, $perPage);
+        return;
+    }
+
+    if ($method === 'PUT') {
+        handleAdminTopups($method, $id, $input);
+        return;
+    }
+
+    Response::error('Method not allowed', 405);
 }
 
 function handleAdminUsers(string $method, ?string $id, array $input): void {
@@ -156,7 +279,7 @@ function handleAdminTopups(string $method, ?string $id, array $input): void {
             
             // Record transaction
             $db->insert('wallet_transactions', [
-                'id' => generateUUID(),
+                'id' => adminGenerateUUID(),
                 'user_id' => $request['user_id'],
                 'type' => 'credit',
                 'amount' => $totalCredit,
@@ -289,7 +412,7 @@ function calculateTopupBonus(int $amount): int {
     return 0;
 }
 
-function generateUUID(): string {
+function adminGenerateUUID(): string {
     return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         mt_rand(0, 0xffff), mt_rand(0, 0xffff),
         mt_rand(0, 0xffff),

@@ -275,14 +275,30 @@ export function NewTopupPage() {
     try {
       const response = await api.verifyTopup(createdTopup.id);
 
-      if (response.success) {
+      const verified = (response as any)?.data?.verified;
+
+      // PHP backend returns success=true even when not found yet (verified=false).
+      // Only navigate to history when we are actually verified.
+      if (response.success && verified === true) {
         toast.success(response.message || (lang === 'en' ? 'Top-up successful!' : 'Nạp tiền thành công!'));
         queryClient.invalidateQueries({ queryKey: ['topups'] });
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         navigate('/account/topups');
-      } else {
-        toast.error(response.message || (lang === 'en' ? 'Transaction not found' : 'Không tìm thấy giao dịch'));
+        return;
       }
+
+      if (response.success && verified === false) {
+        toast.info(
+          (response as any)?.data?.message ||
+            response.message ||
+            (lang === 'en'
+              ? 'Transaction not found yet. Please try again in a few minutes.'
+              : 'Chưa tìm thấy giao dịch. Vui lòng thử lại sau vài phút.')
+        );
+        return;
+      }
+
+      toast.error(response.message || (lang === 'en' ? 'Transaction not found' : 'Không tìm thấy giao dịch'));
     } catch (error) {
       console.error('Verify error:', error);
       toast.error(lang === 'en' ? 'An error occurred' : 'Đã xảy ra lỗi');

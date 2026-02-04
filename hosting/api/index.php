@@ -114,7 +114,9 @@ try {
             
         case 'admin':
             require_once __DIR__ . '/endpoints/admin.php';
-            handleAdmin($method, $action, $id, $input);
+            // For /admin/{resource}/{id?}, the 2nd segment is the resource/action
+            // and the 3rd segment is the resource id.
+            handleAdmin($method, $id, $action, $input);
             break;
             
         case 'health':

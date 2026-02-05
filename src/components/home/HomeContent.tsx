@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { fetchCategories, fetchProducts } from '@/lib/catalog';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatCurrency } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -18,21 +18,16 @@ export function HomeContent() {
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await api.getCategories();
-      return response.data || [];
-    },
+    queryFn: fetchCategories,
   });
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', activeCategory],
-    queryFn: async () => {
-      const response = await api.getProducts({
-        category_id: activeCategory || undefined,
+    queryFn: () =>
+      fetchProducts({
+        categoryId: activeCategory || undefined,
         limit: 12,
-      });
-      return response.data || [];
-    },
+      }),
   });
 
   const categoryTabs = [

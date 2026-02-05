@@ -137,7 +137,15 @@ class ApiClient {
 
   // GET request
   async get<T = any>(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
-    const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+    const queryString = params
+      ? '?' +
+        new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        ).toString()
+      : '';
+
     return this.request<T>(`${endpoint}${queryString}`, { method: 'GET' });
   }
 

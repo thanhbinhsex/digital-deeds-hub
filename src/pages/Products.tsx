@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { fetchCategories, fetchProducts } from '@/lib/catalog';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Input } from '@/components/ui/input';
@@ -15,16 +15,13 @@ export default function ProductsPage() {
   const { t, lang } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  
+
   // Read category from URL query params
   const categorySlug = searchParams.get('category');
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await api.getCategories();
-      return response.data || [];
-    },
+    queryFn: fetchCategories,
   });
 
   // Find category ID from slug
@@ -32,14 +29,12 @@ export default function ProductsPage() {
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', search, selectedCategory],
-    queryFn: async () => {
-      const response = await api.getProducts({
-        category_id: selectedCategory || undefined,
+    queryFn: () =>
+      fetchProducts({
+        categoryId: selectedCategory || undefined,
         search: search || undefined,
-      });
-      return response.data || [];
-    },
-    enabled: !!categories, // Wait for categories to load first
+      }),
+    enabled: categories !== undefined, // Wait for categories to load first
   });
 
   const handleCategoryChange = (slug: string | null) => {
